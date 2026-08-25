@@ -1,3 +1,6 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
 (() => {
   'use strict';
 
@@ -82,12 +85,15 @@
           onStart: () => statEls.forEach(animateCount)
         }, '-=0.2');
 
-      // Generic reveal-up sections
+      // Generic reveal-up sections -- a light 3D perspective flip, not just a fade
       document.querySelectorAll('.reveal-up').forEach((el) => {
-        gsap.fromTo(el, { opacity: 0, y: 24 }, {
-          opacity: 1, y: 0, duration: 0.7, ease: 'power2.out',
-          scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none reverse' }
-        });
+        gsap.fromTo(el,
+          { opacity: 0, y: 28, rotationX: -10, transformPerspective: 900, transformOrigin: '50% 100%' },
+          {
+            opacity: 1, y: 0, rotationX: 0, duration: 0.8, ease: 'power3.out',
+            scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none reverse' }
+          }
+        );
       });
 
       // Timeline items stagger from left
@@ -98,14 +104,15 @@
         });
       });
 
-      // Credential cards stagger
+      // Credential cards stagger -- 3D tumble-in
       gsap.fromTo('.tilt-card',
-        { opacity: 0, y: 24, scale: 0.94 },
+        { opacity: 0, y: 30, rotationX: -25, rotationY: 12, transformPerspective: 800 },
         {
-          opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, ease: 'back.out(1.4)',
+          opacity: 1, y: 0, rotationX: 0, rotationY: 0, duration: 0.6, stagger: 0.08, ease: 'back.out(1.5)',
           scrollTrigger: { trigger: '#credentialGrid', start: 'top 85%', toggleActions: 'play none none reverse' }
         }
       );
+
     }
   } else {
     document.querySelectorAll('.reveal, .reveal-up, .tilt-card').forEach(el => el.style.opacity = 1);
@@ -113,7 +120,8 @@
   }
 
   /* ---------- Tilt cards (pointer-based 3D tilt) ---------- */
-  if (!prefersReduced && window.matchMedia('(hover: hover)').matches) {
+  const canHover = !prefersReduced && window.matchMedia('(hover: hover)').matches;
+  if (canHover) {
     document.querySelectorAll('.tilt-card').forEach(card => {
       const inner = card.querySelector('.tilt-card-inner');
       let raf = null;
@@ -133,12 +141,26 @@
     });
   }
 
+  /* ---------- Magnetic buttons ---------- */
+  if (canHover && window.gsap) {
+    document.querySelectorAll('.btn').forEach((btn) => {
+      const moveX = gsap.quickTo(btn, 'x', { duration: 0.4, ease: 'power3.out' });
+      const moveY = gsap.quickTo(btn, 'y', { duration: 0.4, ease: 'power3.out' });
+      btn.addEventListener('pointermove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        moveX((e.clientX - rect.left - rect.width / 2) * 0.35);
+        moveY((e.clientY - rect.top - rect.height / 2) * 0.35);
+      });
+      btn.addEventListener('pointerleave', () => { moveX(0); moveY(0); });
+    });
+  }
+
   /* ================= THREE.JS SCENES ================= */
-  if (!hasWebGL || !window.THREE) return;
+  if (!hasWebGL) return;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  /* ---- Hero scene: rotating electrical grid / node network ---- */
+  /* ---- Hero scene: node network backdrop + a rigged 3D robot that watches the cursor ---- */
   function initHeroScene() {
     const canvas = document.getElementById('heroCanvas');
     const container = document.getElementById('hero');
@@ -149,23 +171,22 @@
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
 
-    // Lighting (needed for the standard-material character; harmless for the basic-material globe)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
     keyLight.position.set(3, 4, 5);
     scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0xea580c, 1.4, 14);
+    const rimLight = new THREE.PointLight(0xea580c, 1.6, 16);
     rimLight.position.set(-3, 1.5, 3);
     scene.add(rimLight);
+    const fillLight = new THREE.PointLight(0x64748b, 0.6, 16);
+    fillLight.position.set(2, -1, 4);
+    scene.add(fillLight);
 
     // Node network: icosahedron-based points connected by lines (circuit-like)
     const group = new THREE.Group();
     scene.add(group);
 
     const geo = new THREE.IcosahedronGeometry(3.0, 3);
-    const posAttr = geo.attributes.position;
-    const nodeCount = posAttr.count;
-
     const nodesMat = new THREE.PointsMaterial({
       color: 0xea580c, size: 0.045, transparent: true, opacity: 0.9, sizeAttenuation: true
     });
@@ -194,92 +215,77 @@
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    /* ---- Character: a stylized figure in a thobe & ghutra that turns & looks at the mouse ---- */
-    const charPivot = new THREE.Group(); // handles idle float, stays put in world space
-    const charGroup = new THREE.Group(); // handles the head-turn rotation
-    charPivot.add(charGroup);
+    /* ---- Character: a rigged, animated robot (RobotExpressive, three.js sample asset) ---- */
+    const charPivot = new THREE.Group();
     scene.add(charPivot);
+    charPivot.scale.setScalar(0.001);
 
-    // Procedural red/white checkerboard for the ghutra cloth -- no external
-    // texture file needed. NearestFilter + no mipmaps keeps the squares crisp
-    // instead of letting minification blur them into a flat pink wash.
-    function makeGhutraTexture(repeat) {
-      const cells = 4;
-      const cellPx = 16;
-      const size = cells * cellPx;
-      const cnv = document.createElement('canvas');
-      cnv.width = cnv.height = size;
-      const ctx = cnv.getContext('2d');
-      for (let y = 0; y < cells; y++) {
-        for (let x = 0; x < cells; x++) {
-          ctx.fillStyle = (x + y) % 2 === 0 ? '#f4efe6' : '#c81e2c';
-          ctx.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
-        }
+    let mixer = null;
+    const actions = {};
+    let activeAction = null;
+    let headBone = null;
+    let neckBone = null;
+    let robotReady = false;
+
+    function playAction(name, { once = false, next = null } = {}) {
+      const action = actions[name];
+      if (!action || !mixer) return;
+      action.reset();
+      action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
+      action.clampWhenFinished = once;
+      action.fadeIn(0.35);
+      action.play();
+      if (activeAction && activeAction !== action) activeAction.fadeOut(0.35);
+      activeAction = action;
+      if (once && next) {
+        const onFinished = (e) => {
+          if (e.action !== action) return;
+          mixer.removeEventListener('finished', onFinished);
+          playAction(next);
+        };
+        mixer.addEventListener('finished', onFinished);
       }
-      const tex = new THREE.CanvasTexture(cnv);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(repeat, repeat);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.generateMipmaps = false;
-      tex.minFilter = THREE.NearestFilter;
-      tex.magFilter = THREE.NearestFilter;
-      return tex;
     }
-    const ghutraMatCap = new THREE.MeshStandardMaterial({ map: makeGhutraTexture(3), roughness: 0.85 });
-    const ghutraMatFlap = new THREE.MeshStandardMaterial({ map: makeGhutraTexture(1.4), roughness: 0.85, side: THREE.DoubleSide });
 
-    // Thobe (shoulders/torso)
-    const thobeMat = new THREE.MeshStandardMaterial({ color: 0xf1ede3, roughness: 0.8 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.7, 0.9, 28), thobeMat);
-    body.position.y = -0.4;
-    charGroup.add(body);
+    let robotModel = null;
+    new GLTFLoader().load(
+      'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
+      (gltf) => {
+        const model = gltf.scene;
+        model.position.y = -1.05;
+        model.scale.setScalar(0.62);
+        charPivot.add(model);
+        robotModel = model;
+        resize(); // apply the correct desktop/mobile scale now that the model exists
 
-    // Head -- kept plain/neutral (no attempt at a literal likeness); the ghutra
-    // cap, eyes and clothing carry the character's identity instead.
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xc98f63, roughness: 0.6 });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 32), skinMat);
-    head.position.y = 0.5;
-    charGroup.add(head);
+        headBone = model.getObjectByName('Head') || null;
+        neckBone = model.getObjectByName('Neck') || null;
 
-    // Ghutra cap -- a shell slightly larger than the head, so it fully covers it
-    // (an equal- or smaller-radius shell here would z-fight/clip with the head).
-    const ghutraCap = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), ghutraMatCap);
-    ghutraCap.position.y = 0.5;
-    charGroup.add(ghutraCap);
+        mixer = new THREE.AnimationMixer(model);
+        gltf.animations.forEach((clip) => { actions[clip.name] = mixer.clipAction(clip); });
+        robotReady = true;
 
-    // Draped side flaps
-    [-1, 1].forEach((side) => {
-      const flap = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.62), ghutraMatFlap);
-      flap.position.set(side * 0.4, 0.2, 0.05);
-      flap.rotation.y = side * 0.4;
-      flap.rotation.z = side * -0.06;
-      charGroup.add(flap);
-    });
+        if (prefersReduced) {
+          charPivot.scale.setScalar(1);
+          if (actions.Idle) { actions.Idle.play(); mixer.update(0); }
+          renderer.render(scene, camera);
+          return;
+        }
 
-    // Agal (the black cord ring)
-    const agalMat = new THREE.MeshStandardMaterial({ color: 0x14161b, roughness: 0.4 });
-    const agal = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.045, 12, 32), agalMat);
-    agal.position.y = 0.66;
-    agal.rotation.x = Math.PI / 2;
-    charGroup.add(agal);
+        playAction('Wave', { once: true, next: 'Idle' });
+        gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1, ease: 'back.out(1.6)', delay: 0.2 });
 
-    // Eyes must sit further out than the head+ghutra shell (~0.5) along this
-    // angle, otherwise that solid shell occludes them from the camera.
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff8a3d });
-    const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xea580c, transparent: true, opacity: 0.35 });
-    const eyePairs = [-0.16, 0.16].map((baseX) => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 16), eyeMat);
-      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), eyeGlowMat);
-      eye.position.set(baseX, 0.5, 0.58);
-      glow.position.copy(eye.position);
-      charGroup.add(eye, glow);
-      return { eye, glow, baseX, baseY: 0.5 };
-    });
-
-    // Position the character to the right of the (left-aligned, on desktop) hero copy
-    charPivot.position.set(2.7, -0.15, 1.8);
-    charPivot.scale.setScalar(0.001); // pop-in on load
-    gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1.1, ease: 'back.out(1.6)', delay: 0.4 });
+        // A little UI-reactive personality: the robot responds to the primary actions.
+        document.querySelector('.btn-primary')?.addEventListener('mouseenter', () => {
+          if (robotReady) playAction('ThumbsUp', { once: true, next: 'Idle' });
+        });
+        document.querySelector('.btn-ghost')?.addEventListener('mouseenter', () => {
+          if (robotReady) playAction('Yes', { once: true, next: 'Idle' });
+        });
+      },
+      undefined,
+      () => { /* Model failed to load (offline/blocked) -- the globe backdrop still renders fine. */ }
+    );
 
     let w = 0, h = 0;
     function resize() {
@@ -291,19 +297,33 @@
       // Narrow/portrait viewports: park the character centered below the (centered) copy
       // instead of off to the right of a left-aligned column that no longer exists.
       const narrow = w < 780;
-      charPivot.position.x = narrow ? 0 : 2.7;
-      charPivot.position.y = narrow ? -2.6 : -0.3;
+      charPivot.position.x = narrow ? 0 : 2.6;
+      charPivot.position.y = narrow ? -4.6 : -0.1;
       charPivot.userData.baseY = charPivot.position.y;
+      if (robotModel) robotModel.scale.setScalar(narrow ? 0.46 : 0.62);
     }
     resize();
     window.addEventListener('resize', resize);
-    charPivot.userData.baseY = charPivot.position.y;
 
     let mouseX = 0, mouseY = 0;
     window.addEventListener('pointermove', (e) => {
       mouseX = (e.clientX / window.innerWidth) - 0.5;
       mouseY = (e.clientY / window.innerHeight) - 0.5;
     }, { passive: true });
+
+    // Scroll-scrubbed depth: the globe recedes and the camera pulls back as the
+    // visitor scrolls past the hero, instead of just sitting there statically.
+    if (window.gsap && window.ScrollTrigger && !prefersReduced) {
+      const scrollTl = gsap.timeline({
+        scrollTrigger: { trigger: container, start: 'top top', end: 'bottom top', scrub: 0.6 }
+      });
+      // (charPivot.scale is left alone here -- it's owned by the pop-in tween
+      // once the robot loads, and a second tween on the same props would
+      // fight it via GSAP's overwrite handling.)
+      scrollTl
+        .to(camera.position, { z: 13, ease: 'none' }, 0)
+        .to(group.scale, { x: 0.7, y: 0.7, z: 0.7, ease: 'none' }, 0);
+    }
 
     let running = true;
     document.addEventListener('visibilitychange', () => { running = !document.hidden; });
@@ -320,10 +340,14 @@
       return;
     }
 
+    let elapsed = 0;
     function animate() {
       requestAnimationFrame(animate);
       if (!running) return;
-      const t = clock.getElapsedTime();
+      const delta = Math.min(clock.getDelta(), 0.05);
+      elapsed += delta;
+      const t = elapsed;
+
       group.rotation.y = t * 0.06 + mouseX * 0.6;
       group.rotation.x = Math.sin(t * 0.15) * 0.08 + mouseY * 0.3;
       particles.rotation.y = -t * 0.02;
@@ -331,19 +355,19 @@
       camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
       camera.lookAt(0, 0, 0);
 
-      // Character: head turns toward the cursor, eyes track it a little further, idle bob
-      const turnY = mouseX * 0.9;
-      const turnX = mouseY * 0.45;
-      charGroup.rotation.y += (turnY - charGroup.rotation.y) * 0.08;
-      charGroup.rotation.x += (-turnX - charGroup.rotation.x) * 0.08;
+      if (mixer) mixer.update(delta);
+
+      // Head/neck aim toward the cursor, layered on top of whatever clip is playing
+      if (headBone) {
+        headBone.rotation.y += mouseX * 0.55;
+        headBone.rotation.x += -mouseY * 0.3;
+      }
+      if (neckBone) {
+        neckBone.rotation.y += mouseX * 0.2;
+      }
+
       const baseY = charPivot.userData.baseY ?? charPivot.position.y;
-      charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.09;
-      const eyeX = mouseX * 0.035;
-      const eyeY = -mouseY * 0.025;
-      eyePairs.forEach(({ eye, glow, baseX, baseY: eBaseY }) => {
-        eye.position.set(baseX + eyeX, eBaseY + eyeY, 0.58);
-        glow.position.copy(eye.position);
-      });
+      charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.07;
 
       renderer.render(scene, camera);
     }
