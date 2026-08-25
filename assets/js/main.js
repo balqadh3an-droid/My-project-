@@ -194,43 +194,90 @@
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    /* ---- Character: a floating engineer's helmet that turns & looks at the mouse ---- */
+    /* ---- Character: a stylized figure in a thobe & ghutra that turns & looks at the mouse ---- */
     const charPivot = new THREE.Group(); // handles idle float, stays put in world space
     const charGroup = new THREE.Group(); // handles the head-turn rotation
     charPivot.add(charGroup);
     scene.add(charPivot);
 
-    // Solid full sphere for the shell -- a partial/open sphere here would show
-    // a see-through black gap where the cut edge doesn't meet the brim.
-    const shellMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.4, metalness: 0.3 });
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.05, 40, 40), shellMat);
-    charGroup.add(dome);
+    // Procedural red/white checkerboard for the ghutra cloth -- no external
+    // texture file needed. NearestFilter + no mipmaps keeps the squares crisp
+    // instead of letting minification blur them into a flat pink wash.
+    function makeGhutraTexture(repeat) {
+      const cells = 4;
+      const cellPx = 16;
+      const size = cells * cellPx;
+      const cnv = document.createElement('canvas');
+      cnv.width = cnv.height = size;
+      const ctx = cnv.getContext('2d');
+      for (let y = 0; y < cells; y++) {
+        for (let x = 0; x < cells; x++) {
+          ctx.fillStyle = (x + y) % 2 === 0 ? '#f4efe6' : '#c81e2c';
+          ctx.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
+        }
+      }
+      const tex = new THREE.CanvasTexture(cnv);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repeat, repeat);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.generateMipmaps = false;
+      tex.minFilter = THREE.NearestFilter;
+      tex.magFilter = THREE.NearestFilter;
+      return tex;
+    }
+    const ghutraMatCap = new THREE.MeshStandardMaterial({ map: makeGhutraTexture(3), roughness: 0.85 });
+    const ghutraMatFlap = new THREE.MeshStandardMaterial({ map: makeGhutraTexture(1.4), roughness: 0.85, side: THREE.DoubleSide });
 
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.34, 1.34, 0.1, 40), shellMat);
-    brim.position.y = -0.16;
-    charGroup.add(brim);
+    // Thobe (shoulders/torso)
+    const thobeMat = new THREE.MeshStandardMaterial({ color: 0xf1ede3, roughness: 0.8 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.7, 0.9, 28), thobeMat);
+    body.position.y = -0.4;
+    charGroup.add(body);
 
-    // Visor + eyes must sit further out than the dome's own radius (~1.05) at
-    // this angle, otherwise the solid dome mesh occludes them from the camera.
-    const visorMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.25, metalness: 0.6 });
-    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), visorMat);
-    visor.scale.set(1, 0.55, 0.32);
-    visor.position.set(0, -0.05, 0.95);
-    charGroup.add(visor);
+    // Head -- kept plain/neutral (no attempt at a literal likeness); the ghutra
+    // cap, eyes and clothing carry the character's identity instead.
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xc98f63, roughness: 0.6 });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 32), skinMat);
+    head.position.y = 0.5;
+    charGroup.add(head);
 
+    // Ghutra cap -- a shell slightly larger than the head, so it fully covers it
+    // (an equal- or smaller-radius shell here would z-fight/clip with the head).
+    const ghutraCap = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), ghutraMatCap);
+    ghutraCap.position.y = 0.5;
+    charGroup.add(ghutraCap);
+
+    // Draped side flaps
+    [-1, 1].forEach((side) => {
+      const flap = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.62), ghutraMatFlap);
+      flap.position.set(side * 0.4, 0.2, 0.05);
+      flap.rotation.y = side * 0.4;
+      flap.rotation.z = side * -0.06;
+      charGroup.add(flap);
+    });
+
+    // Agal (the black cord ring)
+    const agalMat = new THREE.MeshStandardMaterial({ color: 0x14161b, roughness: 0.4 });
+    const agal = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.045, 12, 32), agalMat);
+    agal.position.y = 0.66;
+    agal.rotation.x = Math.PI / 2;
+    charGroup.add(agal);
+
+    // Eyes must sit further out than the head+ghutra shell (~0.5) along this
+    // angle, otherwise that solid shell occludes them from the camera.
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff8a3d });
     const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xea580c, transparent: true, opacity: 0.35 });
-    const eyePairs = [-0.28, 0.28].map((baseX) => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), eyeMat);
-      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), eyeGlowMat);
-      eye.position.set(baseX, 0, 1.16);
+    const eyePairs = [-0.16, 0.16].map((baseX) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 16), eyeMat);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), eyeGlowMat);
+      eye.position.set(baseX, 0.5, 0.58);
       glow.position.copy(eye.position);
       charGroup.add(eye, glow);
-      return { eye, glow, baseX };
+      return { eye, glow, baseX, baseY: 0.5 };
     });
 
     // Position the character to the right of the (left-aligned, on desktop) hero copy
-    charPivot.position.set(2.7, -0.3, 1.8);
+    charPivot.position.set(2.7, -0.15, 1.8);
     charPivot.scale.setScalar(0.001); // pop-in on load
     gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1.1, ease: 'back.out(1.6)', delay: 0.4 });
 
@@ -291,10 +338,10 @@
       charGroup.rotation.x += (-turnX - charGroup.rotation.x) * 0.08;
       const baseY = charPivot.userData.baseY ?? charPivot.position.y;
       charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.09;
-      const eyeX = mouseX * 0.05;
-      const eyeY = -mouseY * 0.035;
-      eyePairs.forEach(({ eye, glow, baseX }) => {
-        eye.position.set(baseX + eyeX, eyeY, 1.16);
+      const eyeX = mouseX * 0.035;
+      const eyeY = -mouseY * 0.025;
+      eyePairs.forEach(({ eye, glow, baseX, baseY: eBaseY }) => {
+        eye.position.set(baseX + eyeX, eBaseY + eyeY, 0.58);
         glow.position.copy(eye.position);
       });
 
