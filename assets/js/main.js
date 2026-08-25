@@ -149,11 +149,20 @@
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
 
+    // Lighting (needed for the standard-material character; harmless for the basic-material globe)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    keyLight.position.set(3, 4, 5);
+    scene.add(keyLight);
+    const rimLight = new THREE.PointLight(0xea580c, 1.4, 14);
+    rimLight.position.set(-3, 1.5, 3);
+    scene.add(rimLight);
+
     // Node network: icosahedron-based points connected by lines (circuit-like)
     const group = new THREE.Group();
     scene.add(group);
 
-    const geo = new THREE.IcosahedronGeometry(3.4, 3);
+    const geo = new THREE.IcosahedronGeometry(3.0, 3);
     const posAttr = geo.attributes.position;
     const nodeCount = posAttr.count;
 
@@ -185,6 +194,46 @@
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
+    /* ---- Character: a floating engineer's helmet that turns & looks at the mouse ---- */
+    const charPivot = new THREE.Group(); // handles idle float, stays put in world space
+    const charGroup = new THREE.Group(); // handles the head-turn rotation
+    charPivot.add(charGroup);
+    scene.add(charPivot);
+
+    // Solid full sphere for the shell -- a partial/open sphere here would show
+    // a see-through black gap where the cut edge doesn't meet the brim.
+    const shellMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.4, metalness: 0.3 });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.05, 40, 40), shellMat);
+    charGroup.add(dome);
+
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.34, 1.34, 0.1, 40), shellMat);
+    brim.position.y = -0.16;
+    charGroup.add(brim);
+
+    // Visor + eyes must sit further out than the dome's own radius (~1.05) at
+    // this angle, otherwise the solid dome mesh occludes them from the camera.
+    const visorMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.25, metalness: 0.6 });
+    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), visorMat);
+    visor.scale.set(1, 0.55, 0.32);
+    visor.position.set(0, -0.05, 0.95);
+    charGroup.add(visor);
+
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff8a3d });
+    const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xea580c, transparent: true, opacity: 0.35 });
+    const eyePairs = [-0.28, 0.28].map((baseX) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), eyeMat);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), eyeGlowMat);
+      eye.position.set(baseX, 0, 1.16);
+      glow.position.copy(eye.position);
+      charGroup.add(eye, glow);
+      return { eye, glow, baseX };
+    });
+
+    // Position the character to the right of the (left-aligned, on desktop) hero copy
+    charPivot.position.set(2.7, -0.3, 1.8);
+    charPivot.scale.setScalar(0.001); // pop-in on load
+    gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1.1, ease: 'back.out(1.6)', delay: 0.4 });
+
     let w = 0, h = 0;
     function resize() {
       const rect = container.getBoundingClientRect();
@@ -192,9 +241,16 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      // Narrow/portrait viewports: park the character centered below the (centered) copy
+      // instead of off to the right of a left-aligned column that no longer exists.
+      const narrow = w < 780;
+      charPivot.position.x = narrow ? 0 : 2.7;
+      charPivot.position.y = narrow ? -2.6 : -0.3;
+      charPivot.userData.baseY = charPivot.position.y;
     }
     resize();
     window.addEventListener('resize', resize);
+    charPivot.userData.baseY = charPivot.position.y;
 
     let mouseX = 0, mouseY = 0;
     window.addEventListener('pointermove', (e) => {
@@ -227,6 +283,21 @@
       camera.position.x += (mouseX * 1.2 - camera.position.x) * 0.02;
       camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
       camera.lookAt(0, 0, 0);
+
+      // Character: head turns toward the cursor, eyes track it a little further, idle bob
+      const turnY = mouseX * 0.9;
+      const turnX = mouseY * 0.45;
+      charGroup.rotation.y += (turnY - charGroup.rotation.y) * 0.08;
+      charGroup.rotation.x += (-turnX - charGroup.rotation.x) * 0.08;
+      const baseY = charPivot.userData.baseY ?? charPivot.position.y;
+      charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.09;
+      const eyeX = mouseX * 0.05;
+      const eyeY = -mouseY * 0.035;
+      eyePairs.forEach(({ eye, glow, baseX }) => {
+        eye.position.set(baseX + eyeX, eyeY, 1.16);
+        glow.position.copy(eye.position);
+      });
+
       renderer.render(scene, camera);
     }
     animate();
