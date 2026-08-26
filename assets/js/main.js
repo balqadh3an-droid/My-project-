@@ -122,12 +122,23 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       if (current === name) return;
       current = name;
       Object.entries(slides).forEach(([key, el]) => {
+        const active = key === name;
         gsap.to(el, {
-          opacity: key === name ? 1 : 0,
-          duration: 1.1,
+          opacity: active ? 1 : 0,
+          duration: 1.2,
           ease: 'power2.inOut',
           overwrite: 'auto'
         });
+        // The incoming frame settles out of a slight push-in, so each act
+        // lands with a camera-like snap instead of a flat dissolve. This
+        // rides the slide wrapper; the Ken Burns below rides the <img>,
+        // so the two never write to the same transform.
+        if (active) {
+          gsap.fromTo(el,
+            { scale: 1.05 },
+            { scale: 1, duration: 1.6, ease: 'power3.out', overwrite: 'auto' }
+          );
+        }
       });
     }
 
@@ -145,14 +156,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         onEnterBack: () => show(slide)
       });
 
-      // Ken Burns: the frame keeps pushing in across its own act, so the
-      // image is never sitting perfectly still while you read over it.
+      // Ken Burns: the frame keeps pushing in and drifting across its own
+      // act, so the image is never sitting perfectly still while you read.
       const img = slides[slide]?.querySelector('img');
       if (img) {
         gsap.fromTo(img,
-          { scale: 1.06 },
+          { scale: 1.04, yPercent: -1.5 },
           {
-            scale: 1.16, ease: 'none',
+            scale: 1.24, yPercent: 1.5, ease: 'none',
             scrollTrigger: {
               trigger: fromEl, start: 'top bottom',
               endTrigger: toEl, end: 'bottom top', scrub: 1
@@ -194,34 +205,96 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         scrollTrigger: { trigger: '#hero', start: 'center center', end: 'bottom top', scrub: 0.6 }
       });
 
-      // Generic reveal-up sections -- a light 3D perspective flip, not just a fade
-      document.querySelectorAll('.reveal-up').forEach((el) => {
+      /* --- Section headings: the kicker tightens in, then the headline
+             wipes up out of its own baseline like a title card. --- */
+      gsap.utils.toArray('.section-head').forEach((head) => {
+        const kicker = head.querySelector('.kicker');
+        const h2 = head.querySelector('h2');
+        const tl = gsap.timeline({
+          scrollTrigger: { trigger: head, start: 'top 86%', toggleActions: 'play none none reverse' }
+        });
+        if (kicker) {
+          tl.fromTo(kicker,
+            { opacity: 0, y: 18, letterSpacing: '0.5em' },
+            { opacity: 1, y: 0, letterSpacing: '0.16em', duration: 0.8, ease: 'power3.out' }
+          );
+        }
+        if (h2) {
+          tl.fromTo(h2,
+            { opacity: 0, yPercent: 22, clipPath: 'inset(0% 0% 100% 0%)' },
+            { opacity: 1, yPercent: 0, clipPath: 'inset(0% 0% 0% 0%)', duration: 1.15, ease: 'power4.out' },
+            '-=0.5'
+          );
+        }
+      });
+
+      /* --- Generic blocks: rise with a focus-pull, so copy resolves out of
+             the photograph rather than just appearing on top of it. --- */
+      document.querySelectorAll('.reveal-up:not(.section-head)').forEach((el) => {
         gsap.fromTo(el,
-          { opacity: 0, y: 34, rotationX: -8, transformPerspective: 1000, transformOrigin: '50% 100%' },
+          { opacity: 0, y: 48, filter: 'blur(10px)' },
           {
-            opacity: 1, y: 0, rotationX: 0, duration: 0.9, ease: 'power3.out',
+            opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.1, ease: 'power3.out',
             scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none reverse' }
           }
         );
       });
 
-      // Timeline panels rise in sequence
+      /* --- Timeline: each role sweeps in from the left, its veil and
+             bullets resolving a beat behind the heading. --- */
       gsap.utils.toArray('.timeline-item').forEach((el) => {
-        gsap.fromTo(el,
-          { opacity: 0, y: 40 },
+        const body = el.querySelector('.timeline-body');
+        const bullets = el.querySelectorAll('li');
+        const tl = gsap.timeline({
+          scrollTrigger: { trigger: el, start: 'top 86%', toggleActions: 'play none none reverse' }
+        });
+        tl.fromTo(el,
+          { opacity: 0, x: -48, filter: 'blur(8px)' },
+          { opacity: 1, x: 0, filter: 'blur(0px)', duration: 1.0, ease: 'power3.out' }
+        );
+        if (bullets.length) {
+          tl.fromTo(bullets,
+            { opacity: 0, x: -14 },
+            { opacity: 1, x: 0, duration: 0.5, stagger: 0.05, ease: 'power2.out' },
+            '-=0.6'
+          );
+        }
+        if (body) {
+          tl.fromTo(body,
+            { scale: 0.985 },
+            { scale: 1, duration: 1.0, ease: 'power3.out' },
+            0
+          );
+        }
+      });
+
+      // Credential cards stagger -- 3D tumble-in from depth
+      gsap.fromTo('.tilt-card',
+        { opacity: 0, y: 60, z: -180, rotationX: -28, rotationY: 12, transformPerspective: 900 },
+        {
+          opacity: 1, y: 0, z: 0, rotationX: 0, rotationY: 0,
+          duration: 1.0, stagger: 0.09, ease: 'power4.out',
+          scrollTrigger: { trigger: '#credentialGrid', start: 'top 85%', toggleActions: 'play none none reverse' }
+        }
+      );
+
+      // Skill pills pop in per group as each group arrives
+      gsap.utils.toArray('.skill-group').forEach((group) => {
+        gsap.fromTo(group.querySelectorAll('.pill-list li'),
+          { opacity: 0, y: 16, scale: 0.9 },
           {
-            opacity: 1, y: 0, duration: 0.8, ease: 'power3.out',
-            scrollTrigger: { trigger: el, start: 'top 86%', toggleActions: 'play none none reverse' }
+            opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.028, ease: 'back.out(1.7)',
+            scrollTrigger: { trigger: group, start: 'top 88%', toggleActions: 'play none none reverse' }
           }
         );
       });
 
-      // Credential cards stagger -- 3D tumble-in
-      gsap.fromTo('.tilt-card',
-        { opacity: 0, y: 30, rotationX: -22, rotationY: 10, transformPerspective: 800 },
+      // Tech pills on the project card
+      gsap.fromTo('.tech-pills li',
+        { opacity: 0, y: 16, scale: 0.9 },
         {
-          opacity: 1, y: 0, rotationX: 0, rotationY: 0, duration: 0.6, stagger: 0.08, ease: 'back.out(1.5)',
-          scrollTrigger: { trigger: '#credentialGrid', start: 'top 85%', toggleActions: 'play none none reverse' }
+          opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.05, ease: 'back.out(1.7)',
+          scrollTrigger: { trigger: '.tech-pills', start: 'top 90%', toggleActions: 'play none none reverse' }
         }
       );
     }

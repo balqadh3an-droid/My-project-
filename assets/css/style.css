@@ -60,16 +60,18 @@ body{
 .backdrop-slide img{
   width:100%; height:100%; object-fit:cover;
   transform:scale(1.06); will-change:transform;
+  /* Let the photographs run rich -- they are the page, not a texture. */
+  filter:saturate(1.08) contrast(1.06);
 }
-/* Deliberately light: the frosted panels carry local contrast for body copy,
-   so the global scrim only has to darken the extreme top/bottom edges and
-   take the harshest highlights off. Anything heavier and the photography
-   stops reading as photography. */
+/* Almost nothing: a thin darkening at the very top and bottom edges so the
+   fixed nav and the footer keep their footing, plus the faintest corner
+   fall-off. Contrast for body copy is handled locally, per text block, by
+   .veil below -- never by covering the whole photograph. */
 .backdrop-scrim{
   position:absolute; inset:0;
   background:
-    linear-gradient(180deg, rgba(5,7,10,0.72) 0%, rgba(5,7,10,0.26) 26%, rgba(5,7,10,0.30) 72%, rgba(5,7,10,0.78) 100%),
-    radial-gradient(ellipse at 55% 50%, rgba(5,7,10,0) 0%, rgba(5,7,10,0.42) 100%);
+    linear-gradient(180deg, rgba(5,7,10,0.62) 0%, rgba(5,7,10,0.10) 14%, rgba(5,7,10,0) 40%, rgba(5,7,10,0) 62%, rgba(5,7,10,0.14) 86%, rgba(5,7,10,0.55) 100%),
+    radial-gradient(ellipse 92% 88% at 50% 50%, rgba(5,7,10,0) 55%, rgba(5,7,10,0.30) 100%);
 }
 
 /* Layer -10: WebGL canvas (small floating character only) */
@@ -86,12 +88,41 @@ img,canvas{ display:block; max-width:100%; }
 :focus-visible{ outline:2px solid var(--color-accent); outline-offset:3px; border-radius:4px; }
 .reg{ font-size:0.55em; vertical-align:super; }
 
-/* Shared frosted-glass panel */
+/* ===== The veil =====
+   Copy sits directly ON the photograph -- no cards, no blur, no boxes.
+   Each text block instead casts a soft dark halo that bleeds well past
+   its own edges and fades to nothing, so it reads as shadow inside the
+   image rather than a panel laid over it. This is what carries contrast
+   now that the global scrim is essentially gone. */
 .glass-panel{
-  background:var(--glass-bg);
-  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
-  border:var(--glass-border); border-radius:var(--radius-lg);
-  box-shadow:var(--glass-shadow);
+  position:relative;
+  background:transparent; border:0; box-shadow:none; border-radius:0;
+}
+.glass-panel::before{
+  content:''; position:absolute; z-index:-1; pointer-events:none;
+  inset:-46px -70px;
+  background:radial-gradient(ellipse 74% 92% at 40% 50%,
+    rgba(3,5,9,0.95) 0%,
+    rgba(3,5,9,0.90) 40%,
+    rgba(3,5,9,0.72) 62%,
+    rgba(3,5,9,0.30) 82%,
+    rgba(3,5,9,0) 96%);
+}
+/* Safety net: even where a bright patch of photograph sits under the tail
+   of a line, the type keeps its edge. Cheap, and invisible over the dark
+   centre of the halo. */
+.glass-panel :is(p, li, h2, h3, h4, span, a, strong, time){
+  text-shadow:0 2px 14px rgba(3,5,9,0.9), 0 1px 3px rgba(3,5,9,0.7);
+}
+@media (max-width:780px){
+  .glass-panel::before{
+    inset:-28px -30px;
+    background:radial-gradient(ellipse 92% 86% at 50% 50%,
+      rgba(3,5,9,0.94) 0%,
+      rgba(3,5,9,0.86) 40%,
+      rgba(3,5,9,0.55) 66%,
+      rgba(3,5,9,0) 94%);
+  }
 }
 
 .grain{
@@ -240,9 +271,8 @@ img,canvas{ display:block; max-width:100%; }
 }
 .stat{
   text-align:center; min-width:150px; padding:var(--space-3) var(--space-3);
-  background:var(--glass-bg);
-  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
-  border:var(--glass-border); border-radius:var(--radius-md);
+  background:linear-gradient(165deg, rgba(3,5,9,0.72) 0%, rgba(3,5,9,0.52) 100%);
+  border:1px solid rgba(255,255,255,0.10); border-radius:var(--radius-md);
 }
 .stat-num{
   display:block; font-family:var(--font-display); font-size:clamp(1.7rem,3.2vw,2.4rem);
@@ -274,15 +304,29 @@ img,canvas{ display:block; max-width:100%; }
   background:transparent;
 }
 .section-inner{ position:relative; z-index:1; max-width:1180px; margin:0 auto; }
-.section-head{ max-width:680px; margin-bottom:var(--space-6); }
+.section-head{ position:relative; max-width:680px; margin-bottom:var(--space-6); }
+/* Headings that sit on bare photograph (not already inside a veiled block)
+   get their own soft halo, so a title never lands on a bright sky and
+   loses its edge. */
+.section-inner > .section-head::before{
+  content:''; position:absolute; z-index:-1; pointer-events:none;
+  inset:-56px -80px -40px -80px;
+  background:radial-gradient(ellipse 68% 100% at 34% 50%,
+    rgba(3,5,9,0.88) 0%,
+    rgba(3,5,9,0.70) 44%,
+    rgba(3,5,9,0.32) 70%,
+    rgba(3,5,9,0) 92%);
+}
+/* Section headings sit on bare photograph, so they carry their own
+   contrast: a tight double shadow rather than a plate behind them. */
 .kicker{
-  font-size:0.78rem; letter-spacing:.16em; text-transform:uppercase; color:var(--color-accent);
+  font-size:0.8rem; letter-spacing:.16em; text-transform:uppercase; color:var(--color-accent);
   font-weight:700; margin-bottom:var(--space-1);
-  text-shadow:0 2px 16px rgba(0,0,0,0.7);
+  text-shadow:0 2px 10px rgba(3,5,9,0.95), 0 1px 3px rgba(3,5,9,0.9);
 }
 .section-head h2{
-  font-size:clamp(1.9rem,4.2vw,3.1rem); line-height:1.12; letter-spacing:-0.025em;
-  text-shadow:0 3px 30px rgba(0,0,0,0.75);
+  font-size:clamp(2rem,4.4vw,3.3rem); line-height:1.1; letter-spacing:-0.03em; font-weight:700;
+  text-shadow:0 4px 24px rgba(3,5,9,0.92), 0 2px 6px rgba(3,5,9,0.8);
 }
 
 /* About */
@@ -323,18 +367,21 @@ img,canvas{ display:block; max-width:100%; }
 .tilt-card{ perspective:800px; }
 .tilt-card:nth-child(1){ grid-column:span 2; grid-row:span 2; }
 .tilt-card:nth-child(5){ grid-column:span 2; }
+/* Credential cells keep a card shape (the bento grid needs the rhythm) but
+   drop the blur entirely -- a soft dark wash with a hairline edge, so the
+   photograph still reads straight through the gaps between them. */
 .tilt-card-inner{
   height:100%; padding:var(--space-4) var(--space-3); display:flex; flex-direction:column;
-  background:var(--glass-bg);
-  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
-  border:var(--glass-border); border-radius:var(--radius-lg);
-  box-shadow:var(--glass-shadow);
+  background:linear-gradient(165deg, rgba(3,5,9,0.80) 0%, rgba(3,5,9,0.64) 100%);
+  border:1px solid rgba(255,255,255,0.10); border-radius:var(--radius-lg);
+  box-shadow:0 1px 0 rgba(255,255,255,0.05) inset, 0 30px 60px -35px rgba(0,0,0,0.9);
   transform-style:preserve-3d; will-change:transform;
   transition:transform .35s var(--ease), border-color .35s var(--ease), box-shadow .35s var(--ease), background .35s var(--ease);
 }
 .tilt-card-inner:hover{
-  border-color:rgba(255,106,26,0.45);
-  box-shadow:0 1px 0 rgba(255,255,255,0.08) inset, 0 30px 60px -25px rgba(255,106,26,0.3);
+  border-color:rgba(255,106,26,0.5);
+  background:linear-gradient(165deg, rgba(3,5,9,0.84) 0%, rgba(28,10,2,0.66) 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,0.08) inset, 0 30px 60px -25px rgba(255,106,26,0.32);
 }
 .tilt-card:nth-child(1) .tilt-card-inner{ justify-content:center; }
 .tilt-card:nth-child(1) .card-icon{ width:56px; height:56px; }
@@ -412,6 +459,16 @@ img,canvas{ display:block; max-width:100%; }
 /* Skills */
 .skills-groups{ display:flex; flex-direction:column; gap:var(--space-3); }
 .skill-group{ padding:var(--space-4); }
+/* Pills carry their own fill and border, so these blocks need far less
+   halo than prose does -- keep it light or the column reads as banding. */
+.skill-group.glass-panel::before{
+  inset:-24px -50px;
+  background:radial-gradient(ellipse 72% 96% at 40% 50%,
+    rgba(3,5,9,0.74) 0%,
+    rgba(3,5,9,0.56) 48%,
+    rgba(3,5,9,0.20) 74%,
+    rgba(3,5,9,0) 94%);
+}
 .skill-group h4{
   font-size:0.85rem; color:var(--color-accent); text-transform:uppercase; letter-spacing:.09em;
   margin-bottom:var(--space-2); padding-bottom:10px; border-bottom:1px solid var(--color-border);
