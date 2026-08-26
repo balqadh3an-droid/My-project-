@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="Basil Ali Alqahtani — Electrical Engineer, PMP®">
 <meta name="twitter:description" content="Site Electrical Engineer on the PIF Azm Program, deployed to the Qiddiya Speed Park Track (FIA Grade 1) with El Seif Engineering Contracting.">
 <meta name="twitter:image" content="https://www.basils.info/assets/img/basil.jpg">
-<meta name="theme-color" content="#0a0d12">
+<meta name="theme-color" content="#05070a">
 
 <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,6 +27,42 @@
 <body>
 
 <a class="skip-link" href="#top">Skip to content</a>
+
+<!-- CINEMATIC BACKDROP: full-viewport photography, cross-faded on scroll -->
+<div class="backdrop" aria-hidden="true">
+  <div class="backdrop-slide" data-slide="hero">
+    <picture>
+      <source srcset="assets/img/scenes/grid-sunset.webp" type="image/webp">
+      <img src="assets/img/scenes/grid-sunset.jpg" alt="" decoding="async">
+    </picture>
+  </div>
+  <div class="backdrop-slide" data-slide="about">
+    <picture>
+      <source srcset="assets/img/scenes/solar.webp" type="image/webp">
+      <img src="assets/img/scenes/solar.jpg" alt="" loading="lazy" decoding="async">
+    </picture>
+  </div>
+  <div class="backdrop-slide" data-slide="experience">
+    <picture>
+      <source srcset="assets/img/scenes/site-crew.webp" type="image/webp">
+      <img src="assets/img/scenes/site-crew.jpg" alt="" loading="lazy" decoding="async">
+    </picture>
+  </div>
+  <div class="backdrop-slide" data-slide="projects">
+    <picture>
+      <source srcset="assets/img/scenes/circuit-macro.webp" type="image/webp">
+      <img src="assets/img/scenes/circuit-macro.jpg" alt="" loading="lazy" decoding="async">
+    </picture>
+  </div>
+  <div class="backdrop-slide" data-slide="skills">
+    <picture>
+      <source srcset="assets/img/scenes/wind-dusk.webp" type="image/webp">
+      <img src="assets/img/scenes/wind-dusk.jpg" alt="" loading="lazy" decoding="async">
+    </picture>
+  </div>
+  <div class="backdrop-scrim"></div>
+</div>
+
 <canvas id="webglCanvas" aria-hidden="true"></canvas>
 <div class="cursor-dot" aria-hidden="true"></div>
 <div class="grain"></div>
@@ -52,8 +88,6 @@
 
   <!-- HERO -->
   <section class="hero" id="hero">
-    <div class="hero-vignette" aria-hidden="true"></div>
-    <div class="hero-veil" aria-hidden="true"></div>
     <div class="hero-content">
       <p class="hero-eyebrow reveal">SCE&nbsp;Verified&nbsp;·&nbsp;PMP&reg;</p>
       <h1 class="hero-title">
@@ -95,71 +129,59 @@
           <img src="assets/img/basil.jpg" alt="Portrait of Basil Ali Alqahtani" width="900" height="971" loading="lazy" decoding="async">
         </picture>
       </div>
-      <div class="about-copy">
-      <div class="section-head reveal-up">
-        <p class="kicker">About</p>
-        <h2>Engineering that has to hold up in the field.</h2>
-      </div>
-      <div class="about-body reveal-up">
-        <p>
-          I'm an Electrical Engineer on the <strong>PIF Azm Program</strong>, a
-          national development program that places Saudi engineers on Vision
-          2030 giga-projects while completing a Pearson Edexcel Level&nbsp;4
-          NVQ Diploma in Construction Site Supervision.
-        </p>
-        <p>
-          I'm deployed to the <strong>Qiddiya Speed Park Track</strong>, an
-          FIA Grade&nbsp;1 circuit and the future home of the Formula&nbsp;1
-          Saudi Arabian Grand Prix, on site with El Seif Engineering
-          Contracting, a PIF portfolio company.
-        </p>
-        <p>
-          I earned my <strong>PMP&reg;</strong> during the programme, passing
-          Above Target on the first attempt, studied around full days of live
-          construction work.
-        </p>
-        <p>
-          My technical foundation is power systems. Before the site, it was
-          the grid.
-        </p>
-        <p>
-          What holds my attention is the question underneath the
-          installation: what did we plan, what actually happened, and what
-          does the gap tell us before it becomes expensive.
-        </p>
-        <div class="about-meta">
-          <div class="meta-row">
-            <span class="meta-label">Program</span>
-            <span class="meta-value">PIF Azm Program — Vision 2030</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Deployment</span>
-            <span class="meta-value">Qiddiya Speed Park Track · El Seif Engineering Contracting</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Location</span>
-            <span class="meta-value">Riyadh, KSA · <time id="localClock">--:--:--</time></span>
+      <div class="about-copy glass-panel reveal-up">
+        <div class="section-head">
+          <p class="kicker">About</p>
+          <h2>Engineering that has to hold up in the field.</h2>
+        </div>
+        <div class="about-body">
+          <p>
+            I'm an Electrical Engineer on the <strong>PIF Azm Program</strong>, a
+            national development program that places Saudi engineers on Vision
+            2030 giga-projects while completing a Pearson Edexcel Level&nbsp;4
+            NVQ Diploma in Construction Site Supervision.
+          </p>
+          <p>
+            I'm deployed to the <strong>Qiddiya Speed Park Track</strong>, an
+            FIA Grade&nbsp;1 circuit and the future home of the Formula&nbsp;1
+            Saudi Arabian Grand Prix, on site with El Seif Engineering
+            Contracting, a PIF portfolio company.
+          </p>
+          <p>
+            I earned my <strong>PMP&reg;</strong> during the programme, passing
+            Above Target on the first attempt, studied around full days of live
+            construction work.
+          </p>
+          <p>
+            My technical foundation is power systems. Before the site, it was
+            the grid.
+          </p>
+          <p>
+            What holds my attention is the question underneath the
+            installation: what did we plan, what actually happened, and what
+            does the gap tell us before it becomes expensive.
+          </p>
+          <div class="about-meta">
+            <div class="meta-row">
+              <span class="meta-label">Program</span>
+              <span class="meta-value">PIF Azm Program — Vision 2030</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Deployment</span>
+              <span class="meta-value">Qiddiya Speed Park Track · El Seif Engineering Contracting</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Location</span>
+              <span class="meta-value">Riyadh, KSA · <time id="localClock">--:--:--</time></span>
+            </div>
           </div>
         </div>
       </div>
-      </div>
     </div>
-  </section>
-
-  <!-- DIVIDER -->
-  <section class="divider" aria-hidden="true">
-    <div class="divider-media">
-      <picture>
-        <source srcset="assets/img/scenes/power-grid.webp" type="image/webp">
-        <img src="assets/img/scenes/power-grid.jpg" alt="" loading="lazy" decoding="async">
-      </picture>
-    </div>
-    <div class="divider-overlay"></div>
-    <p class="divider-caption">The grid, first.</p>
   </section>
 
   <!-- CREDENTIALS -->
-  <section class="section section-alt" id="credentials">
+  <section class="section" id="credentials">
     <div class="section-inner">
       <div class="section-head reveal-up">
         <p class="kicker">Credentials</p>
@@ -232,16 +254,9 @@
         <h2>On site, under pressure, on schedule.</h2>
       </div>
       <ol class="timeline">
-        <li class="timeline-item" id="exp-pif">
-          <div class="section-backdrop" aria-hidden="true">
-            <picture>
-              <source srcset="assets/img/scenes/construction.webp" type="image/webp">
-              <img src="assets/img/scenes/construction.jpg" alt="" loading="lazy" decoding="async">
-            </picture>
-            <div class="section-backdrop-mask"></div>
-          </div>
+        <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-body">
+          <div class="timeline-body glass-panel">
             <p class="timeline-date">Public Investment Fund (PIF) · April 2026 &ndash; Present · Riyadh</p>
             <h3>Site Electrical Engineer &mdash; Azm Program</h3>
             <p class="timeline-sub">Qiddiya Speed Park Track, on site with El Seif Engineering Contracting, a PIF portfolio company</p>
@@ -257,16 +272,9 @@
             </ul>
           </div>
         </li>
-        <li class="timeline-item" id="exp-sec">
-          <div class="section-backdrop" aria-hidden="true">
-            <picture>
-              <source srcset="assets/img/scenes/power-grid.webp" type="image/webp">
-              <img src="assets/img/scenes/power-grid.jpg" alt="" loading="lazy" decoding="async">
-            </picture>
-            <div class="section-backdrop-mask"></div>
-          </div>
+        <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-body">
+          <div class="timeline-body glass-panel">
             <p class="timeline-date">Saudi Energy Company · June &ndash; August 2024</p>
             <h3>Electrical Engineering Intern</h3>
             <p class="timeline-sub">Distribution and Automation Group, Asir Region</p>
@@ -282,7 +290,7 @@
         </li>
         <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-body">
+          <div class="timeline-body glass-panel">
             <p class="timeline-date">King Khalid University · August 2023 &ndash; March 2025</p>
             <h3>President, IEEE Student Branch</h3>
             <p>Elected President after serving as Vice President.</p>
@@ -296,7 +304,7 @@
         </li>
         <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-body">
+          <div class="timeline-body glass-panel">
             <p class="timeline-date">Family enterprise · Saudi Arabia</p>
             <h3>Partner &amp; Co-Owner &mdash; Wasom Almoheet Co.</h3>
             <p class="timeline-sub">Real estate, sub-contracting (heavy equipment &amp; fleet), transport, hospitality</p>
@@ -312,7 +320,7 @@
         </li>
         <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-body">
+          <div class="timeline-body glass-panel">
             <p class="timeline-date">Alumni Programs</p>
             <h3>McKinsey &amp; Company</h3>
             <ul>
@@ -325,33 +333,14 @@
     </div>
   </section>
 
-  <!-- DIVIDER -->
-  <section class="divider" aria-hidden="true">
-    <div class="divider-media">
-      <picture>
-        <source srcset="assets/img/scenes/construction.webp" type="image/webp">
-        <img src="assets/img/scenes/construction.jpg" alt="" loading="lazy" decoding="async">
-      </picture>
-    </div>
-    <div class="divider-overlay"></div>
-    <p class="divider-caption">On site, under pressure, on schedule.</p>
-  </section>
-
   <!-- PROJECTS -->
-  <section class="section section-alt" id="projects">
-    <div class="section-backdrop" aria-hidden="true">
-      <picture>
-        <source srcset="assets/img/scenes/circuit.webp" type="image/webp">
-        <img src="assets/img/scenes/circuit.jpg" alt="" loading="lazy" decoding="async">
-      </picture>
-      <div class="section-backdrop-mask"></div>
-    </div>
+  <section class="section" id="projects">
     <div class="section-inner">
       <div class="section-head reveal-up">
         <p class="kicker">Projects</p>
         <h2>The rare shipped software on an electrical CV.</h2>
       </div>
-      <article class="project-card reveal-up">
+      <article class="project-card glass-panel reveal-up">
         <div class="project-card-head">
           <h3>AI Face Recognition System</h3>
           <span class="project-tag">Capstone &middot; King Khalid University</span>
@@ -381,7 +370,7 @@
         <h2>Where the discipline shows up.</h2>
       </div>
       <div class="skills-groups">
-        <div class="skill-group reveal-up">
+        <div class="skill-group glass-panel reveal-up">
           <h4>Power Systems</h4>
           <ul class="pill-list">
             <li>Medium &amp; High Voltage</li>
@@ -399,7 +388,7 @@
             <li>MATLAB</li>
           </ul>
         </div>
-        <div class="skill-group reveal-up">
+        <div class="skill-group glass-panel reveal-up">
           <h4>Project Controls &amp; Delivery</h4>
           <ul class="pill-list">
             <li>Project Management (PMP&reg;)</li>
@@ -414,7 +403,7 @@
             <li>MEP Coordination</li>
           </ul>
         </div>
-        <div class="skill-group reveal-up">
+        <div class="skill-group glass-panel reveal-up">
           <h4>Compliance &amp; Governance</h4>
           <ul class="pill-list">
             <li>Quality Control (WIR / ITP)</li>
@@ -429,7 +418,7 @@
             <li>Site Governance</li>
           </ul>
         </div>
-        <div class="skill-group reveal-up">
+        <div class="skill-group glass-panel reveal-up">
           <h4>Analytical &amp; Digital</h4>
           <ul class="pill-list">
             <li>Structured Problem Solving</li>
@@ -441,7 +430,7 @@
             <li>Generative AI</li>
           </ul>
         </div>
-        <div class="skill-group reveal-up">
+        <div class="skill-group glass-panel reveal-up">
           <h4>Languages</h4>
           <ul class="pill-list">
             <li>Arabic (Native)</li>
@@ -452,25 +441,10 @@
     </div>
   </section>
 
-  <!-- DIVIDER -->
-  <section class="divider" aria-hidden="true">
-    <div class="divider-media">
-      <picture>
-        <source srcset="assets/img/scenes/architecture.webp" type="image/webp">
-        <img src="assets/img/scenes/architecture.jpg" alt="" loading="lazy" decoding="async">
-      </picture>
-    </div>
-    <div class="divider-overlay"></div>
-    <p class="divider-caption">Vision 2030 scale.</p>
-  </section>
-
   <!-- CONTACT -->
   <section class="section contact" id="contact">
-    <div class="section-inner contact-inner">
-      <div class="contact-scene" aria-hidden="true">
-        <canvas id="contactCanvas"></canvas>
-      </div>
-      <div class="contact-content reveal-up">
+    <div class="section-inner contact-inner glass-panel reveal-up">
+      <div class="contact-content">
         <p class="kicker">Get in touch</p>
         <h2>Building something that needs to work<br>the first time?</h2>
         <p class="contact-summary">
