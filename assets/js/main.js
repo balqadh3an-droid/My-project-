@@ -12,6 +12,21 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     } catch (e) { return false; }
   })();
 
+  /* ---------- Smooth scroll (Lenis) synced with GSAP/ScrollTrigger ---------- */
+  if (window.gsap && window.ScrollTrigger) {
+    gsap.registerPlugin(ScrollTrigger);
+  }
+  if (window.Lenis && window.gsap && window.ScrollTrigger && !prefersReduced) {
+    const lenis = new Lenis({
+      duration: 1.05,
+      easing: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+      smoothWheel: true
+    });
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add((time) => lenis.raf(time * 1000));
+    gsap.ticker.lagSmoothing(0);
+  }
+
   /* ---------- Nav ---------- */
   const nav = document.getElementById('nav');
   const onScrollNav = () => nav.classList.toggle('scrolled', window.scrollY > 20);
@@ -109,6 +124,15 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         });
       });
 
+      // Cinematic image dividers -- a slow parallax drift on the image itself
+      // as its section scrolls through, independent of the WebGL scene.
+      gsap.utils.toArray('.divider-media img').forEach((img) => {
+        gsap.fromTo(img, { yPercent: -8 }, {
+          yPercent: 8, ease: 'none',
+          scrollTrigger: { trigger: img.closest('.divider'), start: 'top bottom', end: 'bottom top', scrub: true }
+        });
+      });
+
       // Credential cards stagger -- 3D tumble-in
       gsap.fromTo('.tilt-card',
         { opacity: 0, y: 30, rotationX: -25, rotationY: 12, transformPerspective: 800 },
@@ -203,8 +227,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
   /* ---- Hero scene: a glowing digital planet backdrop + a small corner robot ---- */
   function initHeroScene() {
-    const canvas = document.getElementById('heroCanvas');
-    const container = document.getElementById('hero');
+    const canvas = document.getElementById('webglCanvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(dpr);
 
@@ -214,7 +237,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     // Lighting (needed for the planet core + robot's standard materials;
     // harmless for the basic/points materials, which ignore lights entirely)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+    scene.add(ambientLight);
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
     keyLight.position.set(3, 4, 5);
     scene.add(keyLight);
@@ -228,10 +252,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     const gridGeo = new THREE.IcosahedronGeometry(2.15, 3);
 
+    // A "glass core" -- physical material with transmission/clearcoat so the
+    // planet reads as translucent energy rather than flat matte plastic.
     const core = new THREE.Mesh(
-      new THREE.SphereGeometry(2.1, 48, 48),
-      new THREE.MeshStandardMaterial({
-        color: 0x0c1016, roughness: 0.55, metalness: 0.35,
+      new THREE.SphereGeometry(2.1, 64, 64),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x0c1016, roughness: 0.3, metalness: 0.1,
+        transmission: 0.5, thickness: 1.3, ior: 1.4,
+        clearcoat: 0.6, clearcoatRoughness: 0.25,
         emissive: 0x2a1206, emissiveIntensity: 0.5
       })
     );
@@ -242,6 +270,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     });
     const nodes = new THREE.Points(gridGeo, nodesMat);
     group.add(nodes);
+
+    // A finer, denser particle mist just above the grid surface for extra depth.
+    const mistGeo = new THREE.IcosahedronGeometry(2.3, 4);
+    const mistMat = new THREE.PointsMaterial({
+      color: 0xffb27a, size: 0.018, transparent: true, opacity: 0.5, sizeAttenuation: true
+    });
+    const mist = new THREE.Points(mistGeo, mistMat);
+    group.add(mist);
 
     const edgesGeo = new THREE.EdgesGeometry(gridGeo, 1);
     const edgesMat = new THREE.LineBasicMaterial({ color: 0xea580c, transparent: true, opacity: 0.4 });
@@ -391,16 +427,18 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     let w = 0, h = 0;
     function resize() {
-      const rect = container.getBoundingClientRect();
-      w = rect.width; h = rect.height;
+      w = window.innerWidth; h = window.innerHeight;
       renderer.setSize(w, h, false);
+      const narrow = w < 780;
+      // Widen the FOV on small screens so the planet doesn't feel cramped
+      // or clipped in a narrow, tall viewport.
+      camera.fov = narrow ? 62 : 50;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
 
       // Keep the robot pinned to a screen corner: top-right on desktop
       // (copy is left-aligned there), bottom-right on mobile (copy is
       // centered full-width up top, so there's no side margin to use).
-      const narrow = w < 780;
       charPivot.position.x = narrow ? 1.35 : 5.0;
       charPivot.position.y = narrow ? -2.6 : 2.6;
       charPivot.userData.baseY = charPivot.position.y;
@@ -421,11 +459,20 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     // does the work instead of just sitting there statically. Mobile and
     // reduced-motion skip the pin (heavy scroll-jacking reads badly on touch)
     // and get a plain, cheap recede-and-fade instead.
+    // Scroll-driven additive offsets. These live on plain objects (not on
+    // camera.position/group.rotation directly) wherever the render loop also
+    // writes to that property every frame -- letting GSAP tween the offset
+    // object avoids the tween and the per-frame mouse-parallax code fighting
+    // over the same value.
+    const scrollCam = { x: 0, y: 0 };
+    const scrollTilt = { x: 0 };
+    const scrollSpin = { mult: 1, extra: 0 };
+
     const isDesktop = window.matchMedia('(min-width: 780px)').matches;
     if (window.gsap && window.ScrollTrigger && !prefersReduced && isDesktop) {
       const veil = document.querySelector('.hero-veil');
       gsap.timeline({
-        scrollTrigger: { trigger: container, start: 'top top', end: '+=100%', scrub: 0.7, pin: true }
+        scrollTrigger: { trigger: '#hero', start: 'top top', end: '+=100%', scrub: 0.7, pin: true }
       })
         .to('.hero-content', { opacity: 0, y: -40, duration: 0.3, ease: 'power1.in' }, 0)
         .to('.hero-stats', { opacity: 0, y: -20, duration: 0.26, ease: 'power1.in' }, 0)
@@ -436,10 +483,53 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         .to(veil, { opacity: 1, duration: 0.35, ease: 'power2.in' }, 0.6);
     } else if (window.gsap && window.ScrollTrigger && !prefersReduced) {
       gsap.timeline({
-        scrollTrigger: { trigger: container, start: 'top top', end: 'bottom top', scrub: 0.6 }
+        scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 0.6 }
       })
         .to(camera.position, { z: 13, ease: 'none' }, 0)
         .to(group.scale, { x: 0.7, y: 0.7, z: 0.7, ease: 'none' }, 0);
+    }
+
+    // Acts 2-4: as later sections scroll through view, drift the camera,
+    // lighting mood and rotation without pinning -- an ambient parallax
+    // "flight" behind the content rather than a scroll-jacked hijack.
+    if (window.gsap && window.ScrollTrigger && !prefersReduced) {
+      const heroEndZ = isDesktop ? 1.3 : 13;
+      const heroEndScale = isDesktop ? 2.6 : 0.7;
+
+      // Act 2 -- About + Credentials: emerge from the close Hero flythrough
+      // back out to a calm establishing shot; stars, rings and glow return.
+      gsap.timeline({
+        scrollTrigger: {
+          trigger: '#about', start: 'top bottom', endTrigger: '#credentials', end: 'bottom top', scrub: 0.8
+        }
+      })
+        .fromTo(camera.position, { z: heroEndZ }, { z: 8, ease: 'none' }, 0)
+        .fromTo(group.scale, { x: heroEndScale, y: heroEndScale, z: heroEndScale }, { x: 1, y: 1, z: 1, ease: 'none' }, 0)
+        .fromTo(starsFar.material, { opacity: 0 }, { opacity: 0.55, ease: 'none' }, 0)
+        .fromTo(starsNear.material, { opacity: 0 }, { opacity: 0.6, ease: 'none' }, 0)
+        .fromTo(core.material, { emissiveIntensity: 0.5 }, { emissiveIntensity: 0.9, ease: 'none' }, 0)
+        .fromTo(scrollCam, { x: 0, y: 0 }, { x: -0.6, y: 0.15, ease: 'none' }, 0);
+
+      // Act 3 -- Experience: a sweeping lateral orbit and darker, harder-working tones.
+      gsap.timeline({
+        scrollTrigger: { trigger: '#experience', start: 'top bottom', end: 'bottom top', scrub: 0.8 }
+      })
+        .fromTo(scrollCam, { x: -0.6 }, { x: 1.4, ease: 'none' }, 0)
+        .fromTo(scrollSpin, { extra: 0 }, { extra: 1.1, ease: 'none' }, 0)
+        .fromTo(rimLight, { intensity: 1.8 }, { intensity: 0.9, ease: 'none' }, 0)
+        .fromTo(ambientLight, { intensity: 0.55 }, { intensity: 0.32, ease: 'none' }, 0)
+        .fromTo(camera.position, { z: 8 }, { z: 6.4, ease: 'none' }, 0);
+
+      // Act 4 -- Skills: settle into a locked, top-down overview as the spin damps.
+      gsap.timeline({
+        scrollTrigger: { trigger: '#skills', start: 'top bottom', end: 'bottom bottom', scrub: 0.8 }
+      })
+        .fromTo(scrollCam, { x: 1.4, y: 0.15 }, { x: 0, y: 0.9, ease: 'none' }, 0)
+        .fromTo(scrollTilt, { x: 0 }, { x: 0.5, ease: 'none' }, 0)
+        .fromTo(scrollSpin, { mult: 1 }, { mult: 0.2, ease: 'none' }, 0)
+        .fromTo(rimLight, { intensity: 0.9 }, { intensity: 1.4, ease: 'none' }, 0)
+        .fromTo(ambientLight, { intensity: 0.32 }, { intensity: 0.5, ease: 'none' }, 0)
+        .fromTo(camera.position, { z: 6.4 }, { z: 9.5, ease: 'none' }, 0);
     }
 
     let running = true;
@@ -465,14 +555,15 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       elapsed += delta;
       const t = elapsed;
 
-      group.rotation.y = t * 0.06 + mouseX * 0.6;
-      group.rotation.x = Math.sin(t * 0.15) * 0.08 + mouseY * 0.3;
+      group.rotation.y = t * 0.06 * scrollSpin.mult + mouseX * 0.6 + scrollSpin.extra;
+      group.rotation.x = Math.sin(t * 0.15) * 0.08 + mouseY * 0.3 + scrollTilt.x;
       ring1.rotation.z += delta * 0.05;
       ring2.rotation.z -= delta * 0.03;
       starsFar.rotation.y = -t * 0.012;
       starsNear.rotation.y = -t * 0.02;
-      camera.position.x += (mouseX * 1.2 - camera.position.x) * 0.02;
-      camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
+      mist.rotation.y = t * 0.03;
+      camera.position.x += (mouseX * 1.2 + scrollCam.x - camera.position.x) * 0.04;
+      camera.position.y += (-mouseY * 1.2 + scrollCam.y - camera.position.y) * 0.04;
       camera.lookAt(0, 0, 0);
 
       if (mixer) mixer.update(delta);

@@ -31,6 +31,11 @@ html{ scroll-behavior:smooth; }
   *,*::before,*::after{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important; }
 }
 
+html, body{
+  touch-action:pan-y; /* let touch scroll pass straight through the fixed
+    pointer-events:none canvas and any GSAP/Lenis listeners without the
+    browser second-guessing whether a gesture is a pan or a zoom/pinch */
+}
 body{
   margin:0;
   background:var(--color-bg);
@@ -40,6 +45,14 @@ body{
   line-height:1.6;
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
+}
+
+/* The persistent WebGL scene: fixed behind the whole page, not just the
+   hero, so the camera's journey stays visible through every section
+   (the "seam" gradients on .section/.section-alt below let it peek through
+   at each boundary rather than getting fully hidden by opaque panels). */
+#webglCanvas{
+  position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none;
 }
 
 a{ color:inherit; text-decoration:none; }
@@ -136,10 +149,7 @@ img,canvas{ display:block; max-width:100%; }
   align-items:center; justify-content:center; text-align:center;
   padding:calc(var(--nav-h) + var(--space-4)) var(--space-3) var(--space-6);
   overflow:hidden;
-  background:radial-gradient(ellipse at 50% -10%, #171d27 0%, #0a0d12 60%);
-}
-#heroCanvas{
-  position:absolute; inset:0; width:100%; height:100%; z-index:0;
+  background:transparent; /* the fixed #webglCanvas behind the page is the hero's backdrop now */
 }
 .hero-vignette{
   position:absolute; inset:0; z-index:1; pointer-events:none;
@@ -214,8 +224,19 @@ img,canvas{ display:block; max-width:100%; }
 }
 
 /* ===== Sections ===== */
-.section{ position:relative; padding:var(--space-8) var(--space-3); }
-.section-alt{ background:var(--color-bg-alt); border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border); }
+/* Each section fades in from transparent over its first ~240px instead of a
+   hard-cut opaque background, so the persistent WebGL canvas behind the page
+   briefly "peeks through" at every section boundary as you scroll -- the
+   camera's current act stays visible in that seam even though the bulk of
+   each section sits on a solid, fully-readable background as before. */
+.section{
+  position:relative; padding:var(--space-8) var(--space-3);
+  background:linear-gradient(to bottom, rgba(10,13,18,0), rgba(10,13,18,1) 240px);
+}
+.section-alt{
+  background:linear-gradient(to bottom, rgba(13,17,23,0), rgba(13,17,23,1) 240px);
+  border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border);
+}
 .section-inner{ position:relative; z-index:1; max-width:1180px; margin:0 auto; }
 
 /* Soft ambient glow orbs -- a quiet echo of the hero's planet glow, tucked
@@ -262,19 +283,36 @@ img,canvas{ display:block; max-width:100%; }
   .about-photo{ max-width:320px; margin:0 auto; }
 }
 
-/* Credentials — tilt cards */
-.card-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-3); }
+/* Credentials — glassmorphism Bento grid of tilt cards. Same six cards,
+   same content, just two "featured" cells (PMP and Honours Graduate) given
+   more room so the grid reads as a bento layout rather than a plain uniform
+   3x2 -- purely a CSS sizing change, no markup/content difference. */
+.card-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); grid-auto-rows:minmax(150px,auto);
+  gap:var(--space-3);
+}
 .tilt-card{ perspective:800px; }
+.tilt-card:nth-child(1){ grid-column:span 2; grid-row:span 2; }
+.tilt-card:nth-child(5){ grid-column:span 2; }
 .tilt-card-inner{
-  height:100%; padding:var(--space-4) var(--space-3); background:var(--color-card);
-  border:1px solid var(--color-border); border-radius:var(--radius-md);
+  height:100%; padding:var(--space-4) var(--space-3); display:flex; flex-direction:column;
+  background:linear-gradient(160deg, rgba(230,233,239,0.07), rgba(230,233,239,0.02));
+  backdrop-filter:blur(18px) saturate(140%); -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid rgba(226,232,240,0.14); border-radius:var(--radius-lg);
+  box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 20px 50px -30px rgba(0,0,0,0.6);
   transform-style:preserve-3d; will-change:transform;
-  transition:transform .35s var(--ease), border-color .35s var(--ease), box-shadow .35s var(--ease);
+  transition:transform .35s var(--ease), border-color .35s var(--ease), box-shadow .35s var(--ease), background .35s var(--ease);
 }
 .tilt-card-inner:hover{
-  border-color:rgba(234,88,12,0.4);
-  box-shadow:0 20px 40px -20px rgba(234,88,12,0.25);
+  border-color:rgba(234,88,12,0.45);
+  background:linear-gradient(160deg, rgba(234,88,12,0.12), rgba(230,233,239,0.03));
+  box-shadow:0 1px 0 rgba(255,255,255,0.08) inset, 0 24px 55px -25px rgba(234,88,12,0.28);
 }
+.tilt-card:nth-child(1) .tilt-card-inner{ justify-content:center; }
+.tilt-card:nth-child(1) .card-icon{ width:56px; height:56px; }
+.tilt-card:nth-child(1) .card-icon svg{ width:26px; height:26px; }
+.tilt-card:nth-child(1) h3{ font-size:1.35rem; }
+.tilt-card:nth-child(1) p{ font-size:0.98rem; }
 .card-icon{
   display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px;
   border-radius:12px; background:var(--color-accent-soft); color:var(--color-accent); margin-bottom:var(--space-2);
@@ -287,8 +325,14 @@ img,canvas{ display:block; max-width:100%; }
   font-weight:700; text-transform:uppercase; letter-spacing:.05em; vertical-align:middle;
 }
 .tilt-card p{ font-size:0.88rem; color:var(--color-fg-muted); }
-@media (max-width: 900px){ .card-grid{ grid-template-columns:repeat(2,1fr); } }
-@media (max-width: 520px){ .card-grid{ grid-template-columns:1fr; } }
+@media (max-width: 900px){
+  .card-grid{ grid-template-columns:repeat(2,1fr); }
+  .tilt-card:nth-child(1), .tilt-card:nth-child(5){ grid-column:span 2; grid-row:span 1; }
+}
+@media (max-width: 520px){
+  .card-grid{ grid-template-columns:1fr; }
+  .tilt-card:nth-child(1), .tilt-card:nth-child(5){ grid-column:span 1; }
+}
 
 /* Experience — timeline */
 .timeline{ position:relative; padding-left:var(--space-4); }
@@ -370,6 +414,41 @@ img,canvas{ display:block; max-width:100%; }
 .contact-links a{ font-size:0.92rem; color:var(--color-fg-muted); border-bottom:1px solid transparent; transition:color .2s var(--ease), border-color .2s var(--ease); }
 .contact-links a:hover{ color:var(--color-fg); border-color:var(--color-fg-muted); }
 .contact-loc{ margin-top:var(--space-3); color:var(--color-fg-faint); font-size:0.9rem; }
+
+/* ===== Cinematic image dividers ===== */
+.divider{
+  position:relative; height:44vh; min-height:260px; max-height:480px;
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+}
+.divider-media{ position:absolute; inset:-15% 0; z-index:0; }
+.divider-media img{
+  width:100%; height:100%; object-fit:cover;
+  filter:saturate(0.35) contrast(1.15) brightness(0.55);
+}
+.divider-overlay{
+  position:absolute; inset:0; z-index:1;
+  background:
+    linear-gradient(180deg, var(--color-bg) 0%, transparent 20%, transparent 80%, var(--color-bg) 100%),
+    linear-gradient(100deg, rgba(234,88,12,0.32), rgba(10,13,18,0.55) 60%);
+}
+.divider-caption{
+  position:relative; z-index:2; font-family:var(--font-display); font-weight:600;
+  font-size:clamp(1.15rem,3vw,2rem); color:var(--color-fg); letter-spacing:-0.01em;
+  text-shadow:0 2px 24px rgba(0,0,0,0.55); text-align:center; padding:0 var(--space-3);
+}
+@media (max-width:780px){ .divider{ height:30vh; min-height:190px; } }
+
+/* Projects — a faint duotone circuit texture behind the card for atmosphere */
+#projects .section-inner{ position:relative; }
+.projects-media{
+  position:absolute; z-index:0; top:-40px; right:-40px; width:520px; height:420px;
+  border-radius:var(--radius-lg); overflow:hidden; opacity:0.16; pointer-events:none;
+}
+.projects-media img{
+  width:100%; height:100%; object-fit:cover; filter:saturate(0.3) contrast(1.2) brightness(0.7) sepia(0.3) hue-rotate(-10deg);
+}
+.project-card{ position:relative; z-index:1; }
+@media (max-width:900px){ .projects-media{ display:none; } }
 
 /* Footer */
 .footer{ border-top:1px solid var(--color-border); padding:var(--space-3); }
