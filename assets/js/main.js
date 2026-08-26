@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 (() => {
   'use strict';
@@ -82,8 +83,7 @@ import * as THREE from 'three';
         .fromTo('.hero-stats', { opacity: 0, y: 12 }, {
           opacity: 1, y: 0, duration: 0.6,
           onStart: () => statEls.forEach(animateCount)
-        }, '-=0.2')
-        .fromTo('.hero-character', { opacity: 0, y: 16, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.7 }, '-=0.4');
+        }, '-=0.2');
 
       // Generic reveal-up sections -- a light 3D perspective flip, not just a fade
       document.querySelectorAll('.reveal-up').forEach((el) => {
@@ -184,7 +184,7 @@ import * as THREE from 'three';
         dot.classList.add('is-visible');
       }, { passive: true });
       document.addEventListener('pointerleave', () => dot.classList.remove('is-visible'));
-      document.querySelectorAll('a, button, .tilt-card, .hero-character-frame').forEach((el) => {
+      document.querySelectorAll('a, button, .tilt-card').forEach((el) => {
         el.addEventListener('mouseenter', () => dot.classList.add('is-active'));
         el.addEventListener('mouseleave', () => dot.classList.remove('is-active'));
       });
@@ -196,7 +196,7 @@ import * as THREE from 'three';
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  /* ---- Hero scene: rotating electrical grid / node network backdrop ---- */
+  /* ---- Hero scene: node network backdrop + a small corner robot ---- */
   function initHeroScene() {
     const canvas = document.getElementById('heroCanvas');
     const container = document.getElementById('hero');
@@ -206,6 +206,16 @@ import * as THREE from 'three';
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
+
+    // Lighting (needed for the robot's standard material; harmless for the
+    // basic-material globe/particles, which ignore lights entirely)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+    keyLight.position.set(3, 4, 5);
+    scene.add(keyLight);
+    const rimLight = new THREE.PointLight(0xea580c, 1.6, 16);
+    rimLight.position.set(-3, 1.5, 3);
+    scene.add(rimLight);
 
     // Node network: icosahedron-based points connected by lines (circuit-like)
     const group = new THREE.Group();
@@ -240,9 +250,78 @@ import * as THREE from 'three';
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // The hero character is now the Sketchfab "Arab Man (Saudi)" embed (a
-    // separate DOM element, see .hero-character in index.html/style.css) --
-    // this canvas only renders the node-network/particle backdrop.
+    /* ---- Character: a small, corner-anchored rigged robot (RobotExpressive,
+       a CC0 three.js sample asset) so it never competes with the name/stats
+       for attention -- top-right on desktop, bottom-right on mobile. ---- */
+    const charPivot = new THREE.Group();
+    scene.add(charPivot);
+    charPivot.scale.setScalar(0.001);
+
+    let mixer = null;
+    const actions = {};
+    let activeAction = null;
+    let headBone = null;
+    let neckBone = null;
+    let robotReady = false;
+    let robotModel = null;
+
+    function playAction(name, { once = false, next = null } = {}) {
+      const action = actions[name];
+      if (!action || !mixer) return;
+      action.reset();
+      action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
+      action.clampWhenFinished = once;
+      action.fadeIn(0.35);
+      action.play();
+      if (activeAction && activeAction !== action) activeAction.fadeOut(0.35);
+      activeAction = action;
+      if (once && next) {
+        const onFinished = (e) => {
+          if (e.action !== action) return;
+          mixer.removeEventListener('finished', onFinished);
+          playAction(next);
+        };
+        mixer.addEventListener('finished', onFinished);
+      }
+    }
+
+    new GLTFLoader().load(
+      'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
+      (gltf) => {
+        const model = gltf.scene;
+        model.position.y = -1.05;
+        charPivot.add(model);
+        robotModel = model;
+        resize(); // apply the correct desktop/mobile scale + corner position now that the model exists
+
+        headBone = model.getObjectByName('Head') || null;
+        neckBone = model.getObjectByName('Neck') || null;
+
+        mixer = new THREE.AnimationMixer(model);
+        gltf.animations.forEach((clip) => { actions[clip.name] = mixer.clipAction(clip); });
+        robotReady = true;
+
+        if (prefersReduced) {
+          charPivot.scale.setScalar(1);
+          if (actions.Idle) { actions.Idle.play(); mixer.update(0); }
+          renderer.render(scene, camera);
+          return;
+        }
+
+        playAction('Wave', { once: true, next: 'Idle' });
+        gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1, ease: 'back.out(1.6)', delay: 0.2 });
+
+        // A little UI-reactive personality: the robot responds to the primary actions.
+        document.querySelector('.btn-primary')?.addEventListener('mouseenter', () => {
+          if (robotReady) playAction('ThumbsUp', { once: true, next: 'Idle' });
+        });
+        document.querySelector('.btn-ghost')?.addEventListener('mouseenter', () => {
+          if (robotReady) playAction('Yes', { once: true, next: 'Idle' });
+        });
+      },
+      undefined,
+      () => { /* Model failed to load (offline/blocked) -- the globe backdrop still renders fine. */ }
+    );
 
     let w = 0, h = 0;
     function resize() {
@@ -251,6 +330,15 @@ import * as THREE from 'three';
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+
+      // Keep the robot pinned to a screen corner: top-right on desktop
+      // (copy is left-aligned there), bottom-right on mobile (copy is
+      // centered full-width up top, so there's no side margin to use).
+      const narrow = w < 780;
+      charPivot.position.x = narrow ? 1.35 : 5.0;
+      charPivot.position.y = narrow ? -2.6 : 2.6;
+      charPivot.userData.baseY = charPivot.position.y;
+      if (robotModel) robotModel.scale.setScalar(narrow ? 0.15 : 0.22);
     }
     resize();
     window.addEventListener('resize', resize);
@@ -301,6 +389,20 @@ import * as THREE from 'three';
       camera.position.x += (mouseX * 1.2 - camera.position.x) * 0.02;
       camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
       camera.lookAt(0, 0, 0);
+
+      if (mixer) mixer.update(delta);
+
+      // Head/neck aim toward the cursor, layered on top of whatever clip is playing
+      if (headBone) {
+        headBone.rotation.y += mouseX * 0.55;
+        headBone.rotation.x += -mouseY * 0.3;
+      }
+      if (neckBone) {
+        neckBone.rotation.y += mouseX * 0.2;
+      }
+
+      const baseY = charPivot.userData.baseY ?? charPivot.position.y;
+      charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.05;
 
       renderer.render(scene, camera);
     }
