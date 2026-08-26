@@ -225,7 +225,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  /* ---- Hero scene: a refractive glass hypercube backdrop + a small corner robot ---- */
+  /* ---- Hero scene: a glass-obsidian torus knot backdrop + a small corner robot ---- */
   function initHeroScene() {
     const canvas = document.getElementById('webglCanvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -235,8 +235,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
 
-    // Lighting (needed for the cube's physical material + robot's standard
-    // materials; harmless for the points material, which ignores lights entirely)
+    // Lighting (needed for the knot's physical material + robot's standard
+    // materials; harmless for basic materials, which ignore lights entirely)
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
     scene.add(ambientLight);
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -246,52 +246,22 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     rimLight.position.set(-3, 1.5, 3);
     scene.add(rimLight);
 
-    /* ---- The core: a refractive glass hypercube -- an outer crown-glass
-       frame around a nested wireframe cube and a field of ambient sparks.
-       Replaces the earlier "digital planet" per the current visual
-       directive. Kept in the site's established orange accent rather than
-       the brief's literal cyan, so it still reads as the same brand. ---- */
-    const cubeGroup = new THREE.Group();
-    scene.add(cubeGroup);
+    /* ---- The core visual: a single sleek glass-obsidian torus knot --
+       one mesh, no separate rings/starfield/particle layers, per the
+       surgical-swap directive. Kept in the site's orange accent tint. ---- */
+    const group = new THREE.Group();
+    scene.add(group);
 
-    const outerFrame = new THREE.Mesh(
-      new THREE.BoxGeometry(3.2, 3.2, 3.2),
+    const knot = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(1.8, 0.55, 180, 24),
       new THREE.MeshPhysicalMaterial({
-        color: 0x0c1016, roughness: 0.03, metalness: 0.1,
-        transmission: 0.96, thickness: 2.8, ior: 1.52,
-        clearcoat: 1.0, clearcoatRoughness: 0.02,
+        color: 0x0c1016, roughness: 0.05, metalness: 0.15,
+        transmission: 0.94, thickness: 2.0, ior: 1.5,
+        clearcoat: 1.0, clearcoatRoughness: 0.03,
         emissive: 0x2a1206, emissiveIntensity: 0.5
       })
     );
-    cubeGroup.add(outerFrame);
-
-    const innerEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.0, 2.0, 2.0));
-    const innerEdgesMat = new THREE.LineBasicMaterial({ color: 0xea580c, transparent: true, opacity: 0.55 });
-    const innerEdges = new THREE.LineSegments(innerEdgesGeo, innerEdgesMat);
-    cubeGroup.add(innerEdges);
-
-    // Ambient spark field: a shell of points around the cube, each drifting
-    // on its own slow, independent sine path (a cheap stand-in for Brownian
-    // motion) rather than moving as a rigid group like a starfield would.
-    const sparkCount = 220;
-    const sparkGeo = new THREE.BufferGeometry();
-    const sparkBase = new Float32Array(sparkCount * 3);
-    const sparkSeed = new Float32Array(sparkCount);
-    for (let i = 0; i < sparkCount; i++) {
-      const r = 2.6 + Math.random() * 2.4;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos((Math.random() * 2) - 1);
-      sparkBase[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      sparkBase[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      sparkBase[i * 3 + 2] = r * Math.cos(phi);
-      sparkSeed[i] = Math.random() * Math.PI * 2;
-    }
-    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkBase.slice(), 3));
-    const sparkMat = new THREE.PointsMaterial({
-      color: 0xff8a3d, size: 0.05, transparent: true, opacity: 0.7, sizeAttenuation: true
-    });
-    const sparks = new THREE.Points(sparkGeo, sparkMat);
-    scene.add(sparks);
+    group.add(knot);
 
     /* ---- Character: a small, corner-anchored rigged robot (RobotExpressive,
        a CC0 three.js sample asset) so it never competes with the name/stats
@@ -363,7 +333,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         });
       },
       undefined,
-      () => { /* Model failed to load (offline/blocked) -- the cube backdrop still renders fine. */ }
+      () => { /* Model failed to load (offline/blocked) -- the knot backdrop still renders fine. */ }
     );
 
     let w = 0, h = 0;
@@ -371,7 +341,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       w = window.innerWidth; h = window.innerHeight;
       renderer.setSize(w, h, false);
       const narrow = w < 780;
-      // Widen the FOV on small screens so the cube doesn't feel cramped
+      // Widen the FOV on small screens so the knot doesn't feel cramped
       // or clipped in a narrow, tall viewport.
       camera.fov = narrow ? 62 : 50;
       camera.aspect = w / h;
@@ -395,34 +365,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     }, { passive: true });
 
     // Scroll-driven "flythrough": on desktop, pin the hero for one extra
-    // viewport of scroll while the camera flies toward the cube and a veil
+    // viewport of scroll while the camera flies toward the knot and a veil
     // fades to black, then release into About underneath -- the transition
     // does the work instead of just sitting there statically. Mobile and
     // reduced-motion skip the pin (heavy scroll-jacking reads badly on touch)
     // and get a plain, cheap recede-and-fade instead.
     // Scroll-driven additive offsets. These live on plain objects (not on
-    // camera.position/cubeGroup.rotation directly) wherever the render loop
-    // also writes to that property every frame -- letting GSAP tween the
-    // offset object avoids the tween and the per-frame mouse-parallax code
-    // fighting over the same value. cubeGroup.position and .rotation.z are
-    // never touched per-frame, so those are safe to tween directly.
+    // camera.position/group.rotation directly) wherever the render loop also
+    // writes to that property every frame -- letting GSAP tween the offset
+    // object avoids the tween and the per-frame mouse-parallax code fighting
+    // over the same value.
     const scrollCam = { x: 0, y: 0 };
     const scrollTilt = { x: 0 };
-    const scrollRot = { x: 0, y: 0 };
     const scrollSpin = { mult: 1, extra: 0 };
-
-    // Backdrop crossfade helper -- fades one full-bleed photo in then back
-    // out as its own section's scroll trigger passes, self-contained so
-    // consecutive acts never need to coordinate with each other.
-    const backdropEls = {};
-    document.querySelectorAll('.backdrop-slide').forEach((el) => { backdropEls[el.dataset.slide] = el; });
-    function backdropTimeline(name, trigger) {
-      const el = backdropEls[name];
-      if (!el) return;
-      gsap.timeline({ scrollTrigger: { trigger, start: 'top bottom', end: 'bottom top', scrub: 0.8 } })
-        .fromTo(el, { opacity: 0 }, { opacity: 0.6, ease: 'none' }, 0)
-        .to(el, { opacity: 0, ease: 'none' }, 0.7);
-    }
 
     const isDesktop = window.matchMedia('(min-width: 780px)').matches;
     if (window.gsap && window.ScrollTrigger && !prefersReduced && isDesktop) {
@@ -433,85 +388,56 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         .to('.hero-content', { opacity: 0, y: -40, duration: 0.3, ease: 'power1.in' }, 0)
         .to('.hero-stats', { opacity: 0, y: -20, duration: 0.26, ease: 'power1.in' }, 0)
         .to(camera.position, { z: 1.3, ease: 'power1.in', duration: 1 }, 0.05)
-        .to(cubeGroup.rotation, { y: '+=2.6', ease: 'power1.in', duration: 1 }, 0.05)
-        .to(cubeGroup.scale, { x: 2.6, y: 2.6, z: 2.6, ease: 'power1.in', duration: 1 }, 0.05)
-        .to(sparks.material, { opacity: 0, duration: 0.3 }, 0.5)
+        .to(group.rotation, { y: '+=2.6', ease: 'power1.in', duration: 1 }, 0.05)
+        .to(group.scale, { x: 2.6, y: 2.6, z: 2.6, ease: 'power1.in', duration: 1 }, 0.05)
         .to(veil, { opacity: 1, duration: 0.35, ease: 'power2.in' }, 0.6);
     } else if (window.gsap && window.ScrollTrigger && !prefersReduced) {
       gsap.timeline({
         scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 0.6 }
       })
         .to(camera.position, { z: 13, ease: 'none' }, 0)
-        .to(cubeGroup.scale, { x: 0.7, y: 0.7, z: 0.7, ease: 'none' }, 0);
+        .to(group.scale, { x: 0.7, y: 0.7, z: 0.7, ease: 'none' }, 0);
     }
 
-    // Later acts: as each section scrolls through view, drift the camera,
-    // cube position/rotation, lighting mood and backdrop photo -- without
-    // pinning, an ambient parallax "flight" behind the content rather than
-    // a scroll-jacked hijack.
+    // Acts 2-4: as later sections scroll through view, drift the camera,
+    // lighting mood and rotation without pinning -- an ambient parallax
+    // "flight" behind the content rather than a scroll-jacked hijack.
     if (window.gsap && window.ScrollTrigger && !prefersReduced) {
       const heroEndZ = isDesktop ? 1.3 : 13;
       const heroEndScale = isDesktop ? 2.6 : 0.7;
 
-      // Act -- About + Credentials: emerge from the close Hero flythrough
-      // back out to a calm establishing shot; sparks and the glass glow return.
+      // Act 2 -- About + Credentials: emerge from the close Hero flythrough
+      // back out to a calm establishing shot; the glass glow brightens.
       gsap.timeline({
         scrollTrigger: {
           trigger: '#about', start: 'top bottom', endTrigger: '#credentials', end: 'bottom top', scrub: 0.8
         }
       })
         .fromTo(camera.position, { z: heroEndZ }, { z: 8, ease: 'none' }, 0)
-        .fromTo(cubeGroup.scale, { x: heroEndScale, y: heroEndScale, z: heroEndScale }, { x: 1, y: 1, z: 1, ease: 'none' }, 0)
-        .fromTo(sparks.material, { opacity: 0 }, { opacity: 0.7, ease: 'none' }, 0)
-        .fromTo(outerFrame.material, { emissiveIntensity: 0.5 }, { emissiveIntensity: 0.9, ease: 'none' }, 0)
+        .fromTo(group.scale, { x: heroEndScale, y: heroEndScale, z: heroEndScale }, { x: 1, y: 1, z: 1, ease: 'none' }, 0)
+        .fromTo(knot.material, { emissiveIntensity: 0.5 }, { emissiveIntensity: 0.9, ease: 'none' }, 0)
         .fromTo(scrollCam, { x: 0, y: 0 }, { x: -0.6, y: 0.15, ease: 'none' }, 0);
 
-      // Act -- Qiddiya (the PIF/Azm role, first Experience entry in scroll
-      // order): the cube drifts right and darkens alongside the on-site photo.
-      gsap.timeline({ scrollTrigger: { trigger: '#exp-pif', start: 'top bottom', end: 'bottom top', scrub: 0.8 } })
-        .fromTo(cubeGroup.position, { x: 0, y: 0, z: 0 }, { x: 1.9, y: -0.25, z: 0.5, ease: 'none' }, 0)
-        .fromTo(cubeGroup.rotation, { z: 0 }, { z: -0.4, ease: 'none' }, 0)
-        .fromTo(scrollRot, { x: 0, y: 0 }, { x: -0.3, y: 0.8, ease: 'none' }, 0)
-        .fromTo(rimLight, { intensity: 1.8 }, { intensity: 1.3, ease: 'none' }, 0)
-        .fromTo(ambientLight, { intensity: 0.55 }, { intensity: 0.44, ease: 'none' }, 0)
-        .fromTo(camera.position, { z: 8 }, { z: 7.4, ease: 'none' }, 0);
-      backdropTimeline('qiddiya', '#exp-pif');
+      // Act 3 -- Experience: a sweeping lateral orbit and darker, harder-working tones.
+      gsap.timeline({
+        scrollTrigger: { trigger: '#experience', start: 'top bottom', end: 'bottom top', scrub: 0.8 }
+      })
+        .fromTo(scrollCam, { x: -0.6 }, { x: 1.4, ease: 'none' }, 0)
+        .fromTo(scrollSpin, { extra: 0 }, { extra: 1.1, ease: 'none' }, 0)
+        .fromTo(rimLight, { intensity: 1.8 }, { intensity: 0.9, ease: 'none' }, 0)
+        .fromTo(ambientLight, { intensity: 0.55 }, { intensity: 0.32, ease: 'none' }, 0)
+        .fromTo(camera.position, { z: 8 }, { z: 6.4, ease: 'none' }, 0);
 
-      // Act -- SEC (the distribution/grid internship, second Experience
-      // entry): the cube swings left alongside the transmission-tower photo.
-      gsap.timeline({ scrollTrigger: { trigger: '#exp-sec', start: 'top bottom', end: 'bottom top', scrub: 0.8 } })
-        .fromTo(cubeGroup.position, { x: 1.9, y: -0.25, z: 0.5 }, { x: -1.9, y: 0, z: 0.75, ease: 'none' }, 0)
-        .fromTo(cubeGroup.rotation, { z: -0.4 }, { z: 0.2, ease: 'none' }, 0)
-        .fromTo(scrollRot, { x: -0.3, y: 0.8 }, { x: 0.4, y: -0.6, ease: 'none' }, 0)
-        .fromTo(rimLight, { intensity: 1.3 }, { intensity: 0.9, ease: 'none' }, 0)
-        .fromTo(ambientLight, { intensity: 0.44 }, { intensity: 0.32, ease: 'none' }, 0)
-        .fromTo(camera.position, { z: 7.4 }, { z: 6.8, ease: 'none' }, 0);
-      backdropTimeline('sec', '#exp-sec');
-
-      // Act -- AI Capstone (Projects): the cube centres and looms larger,
-      // the inner wireframe pulses brighter, alongside the circuit photo.
-      gsap.timeline({ scrollTrigger: { trigger: '#projects', start: 'top bottom', end: 'bottom top', scrub: 0.8 } })
-        .fromTo(cubeGroup.position, { x: -1.9, y: 0, z: 0.75 }, { x: 0, y: 0, z: 1.75, ease: 'none' }, 0)
-        .fromTo(cubeGroup.rotation, { z: 0.2 }, { z: 0, ease: 'none' }, 0)
-        .fromTo(scrollRot, { x: 0.4, y: -0.6 }, { x: 0, y: 0, ease: 'none' }, 0)
-        .fromTo(innerEdgesMat, { opacity: 0.55 }, { opacity: 0.95, ease: 'none' }, 0)
-        .fromTo(outerFrame.material, { emissiveIntensity: 0.9 }, { emissiveIntensity: 1.1, ease: 'none' }, 0)
-        .fromTo(rimLight, { intensity: 0.9 }, { intensity: 1.3, ease: 'none' }, 0)
-        .fromTo(ambientLight, { intensity: 0.32 }, { intensity: 0.42, ease: 'none' }, 0)
-        .fromTo(camera.position, { z: 6.8 }, { z: 6.2, ease: 'none' }, 0);
-      backdropTimeline('ai', '#projects');
-
-      // Act -- Skills: settle into a locked, centred overview as the spin damps.
+      // Act 4 -- Skills: settle into a locked, top-down overview as the spin damps.
       gsap.timeline({
         scrollTrigger: { trigger: '#skills', start: 'top bottom', end: 'bottom bottom', scrub: 0.8 }
       })
-        .fromTo(cubeGroup.position, { x: 0, y: 0, z: 1.75 }, { x: 0, y: 0, z: 0, ease: 'none' }, 0)
-        .fromTo(scrollCam, { x: -0.6, y: 0.15 }, { x: 0, y: 0.9, ease: 'none' }, 0)
+        .fromTo(scrollCam, { x: 1.4, y: 0.15 }, { x: 0, y: 0.9, ease: 'none' }, 0)
         .fromTo(scrollTilt, { x: 0 }, { x: 0.5, ease: 'none' }, 0)
         .fromTo(scrollSpin, { mult: 1 }, { mult: 0.2, ease: 'none' }, 0)
-        .fromTo(rimLight, { intensity: 1.3 }, { intensity: 1.4, ease: 'none' }, 0)
-        .fromTo(ambientLight, { intensity: 0.42 }, { intensity: 0.5, ease: 'none' }, 0)
-        .fromTo(camera.position, { z: 6.2 }, { z: 9.5, ease: 'none' }, 0);
+        .fromTo(rimLight, { intensity: 0.9 }, { intensity: 1.4, ease: 'none' }, 0)
+        .fromTo(ambientLight, { intensity: 0.32 }, { intensity: 0.5, ease: 'none' }, 0)
+        .fromTo(camera.position, { z: 6.4 }, { z: 9.5, ease: 'none' }, 0);
     }
 
     let running = true;
@@ -520,7 +446,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const clock = new THREE.Clock();
 
     function renderStatic() {
-      cubeGroup.rotation.set(0.3, 0.4, 0);
+      group.rotation.set(0.3, 0.4, 0);
       renderer.render(scene, camera);
     }
 
@@ -537,24 +463,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       elapsed += delta;
       const t = elapsed;
 
-      // Base auto-rotation + mouse-lerped tilt (~±0.15 rad from the cursor)
-      // + the scroll-driven rotation offset, all additive on the same axes.
-      cubeGroup.rotation.y = t * 0.05 * scrollSpin.mult + mouseX * 0.3 + scrollSpin.extra + scrollRot.y;
-      cubeGroup.rotation.x = Math.sin(t * 0.12) * 0.06 + mouseY * 0.3 + scrollTilt.x + scrollRot.x;
-
-      // Ambient sparks: each drifts on its own slow independent path around
-      // its resting position (a cheap Brownian-motion stand-in), plus a
-      // slow shared rotation for a touch of orbital drift.
-      const posAttr = sparks.geometry.attributes.position;
-      for (let i = 0; i < sparkCount; i++) {
-        const seed = sparkSeed[i];
-        posAttr.array[i * 3] = sparkBase[i * 3] + Math.sin(t * 0.4 + seed) * 0.15;
-        posAttr.array[i * 3 + 1] = sparkBase[i * 3 + 1] + Math.cos(t * 0.35 + seed * 1.3) * 0.15;
-        posAttr.array[i * 3 + 2] = sparkBase[i * 3 + 2] + Math.sin(t * 0.3 + seed * 0.7) * 0.15;
-      }
-      posAttr.needsUpdate = true;
-      sparks.rotation.y = t * 0.02;
-
+      group.rotation.y = t * 0.06 * scrollSpin.mult + mouseX * 0.6 + scrollSpin.extra;
+      group.rotation.x = Math.sin(t * 0.15) * 0.08 + mouseY * 0.3 + scrollTilt.x;
       camera.position.x += (mouseX * 1.2 + scrollCam.x - camera.position.x) * 0.04;
       camera.position.y += (-mouseY * 1.2 + scrollCam.y - camera.position.y) * 0.04;
       camera.lookAt(0, 0, 0);
