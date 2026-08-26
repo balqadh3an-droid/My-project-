@@ -235,33 +235,54 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
 
-    // Lighting (needed for the knot's physical material + robot's standard
-    // materials; harmless for basic materials, which ignore lights entirely)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+    // Cinematic two-tone lighting rig: a cyan key for highlight pop against
+    // a dark obsidian fill, with the site's orange kept as the rim accent
+    // so the brand colour still reads even though the key light is cyan.
+    const ambientLight = new THREE.AmbientLight(0x0f172a, 1.2);
     scene.add(ambientLight);
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
-    keyLight.position.set(3, 4, 5);
+    const keyLight = new THREE.PointLight(0x00f0ff, 4.5, 40);
+    keyLight.position.set(6, 6, 6);
     scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0xea580c, 1.8, 20);
-    rimLight.position.set(-3, 1.5, 3);
+    const rimLight = new THREE.DirectionalLight(0xff5500, 3.0);
+    rimLight.position.set(-8, -4, -5);
     scene.add(rimLight);
 
     /* ---- The core visual: a single sleek glass-obsidian torus knot --
        one mesh, no separate rings/starfield/particle layers, per the
-       surgical-swap directive. Kept in the site's orange accent tint. ---- */
+       surgical-swap directive. ---- */
     const group = new THREE.Group();
     scene.add(group);
 
     const knot = new THREE.Mesh(
       new THREE.TorusKnotGeometry(1.8, 0.55, 180, 24),
       new THREE.MeshPhysicalMaterial({
-        color: 0x0c1016, roughness: 0.05, metalness: 0.15,
-        transmission: 0.94, thickness: 2.0, ior: 1.5,
-        clearcoat: 1.0, clearcoatRoughness: 0.03,
-        emissive: 0x2a1206, emissiveIntensity: 0.5
+        color: 0x070b14, transmission: 0.95, opacity: 1.0, transparent: true,
+        roughness: 0.03, metalness: 0.05, ior: 1.52, thickness: 2.8,
+        clearcoat: 1.0, clearcoatRoughness: 0.02,
+        emissive: 0x0a1420, emissiveIntensity: 0.5
       })
     );
     group.add(knot);
+
+    // Ambient spark field: a shell of cyan points drifting slowly around
+    // the knot, each independently on its own slow orbit.
+    const sparkCount = 160;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPositions = new Float32Array(sparkCount * 3);
+    for (let i = 0; i < sparkCount; i++) {
+      const r = 2.6 + Math.random() * 2.2;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+      sparkPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      sparkPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      sparkPositions[i * 3 + 2] = r * Math.cos(phi);
+    }
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      color: 0x00f0ff, size: 0.04, transparent: true, opacity: 0.5, sizeAttenuation: true
+    });
+    const sparks = new THREE.Points(sparkGeo, sparkMat);
+    scene.add(sparks);
 
     /* ---- Character: a small, corner-anchored rigged robot (RobotExpressive,
        a CC0 three.js sample asset) so it never competes with the name/stats
@@ -424,8 +445,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       })
         .fromTo(scrollCam, { x: -0.6 }, { x: 1.4, ease: 'none' }, 0)
         .fromTo(scrollSpin, { extra: 0 }, { extra: 1.1, ease: 'none' }, 0)
-        .fromTo(rimLight, { intensity: 1.8 }, { intensity: 0.9, ease: 'none' }, 0)
-        .fromTo(ambientLight, { intensity: 0.55 }, { intensity: 0.32, ease: 'none' }, 0)
+        .fromTo(rimLight, { intensity: 3.0 }, { intensity: 1.5, ease: 'none' }, 0)
+        .fromTo(ambientLight, { intensity: 1.2 }, { intensity: 0.7, ease: 'none' }, 0)
         .fromTo(camera.position, { z: 8 }, { z: 6.4, ease: 'none' }, 0);
 
       // Act 4 -- Skills: settle into a locked, top-down overview as the spin damps.
@@ -435,8 +456,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         .fromTo(scrollCam, { x: 1.4, y: 0.15 }, { x: 0, y: 0.9, ease: 'none' }, 0)
         .fromTo(scrollTilt, { x: 0 }, { x: 0.5, ease: 'none' }, 0)
         .fromTo(scrollSpin, { mult: 1 }, { mult: 0.2, ease: 'none' }, 0)
-        .fromTo(rimLight, { intensity: 0.9 }, { intensity: 1.4, ease: 'none' }, 0)
-        .fromTo(ambientLight, { intensity: 0.32 }, { intensity: 0.5, ease: 'none' }, 0)
+        .fromTo(rimLight, { intensity: 1.5 }, { intensity: 2.3, ease: 'none' }, 0)
+        .fromTo(ambientLight, { intensity: 0.7 }, { intensity: 0.9, ease: 'none' }, 0)
         .fromTo(camera.position, { z: 6.4 }, { z: 9.5, ease: 'none' }, 0);
     }
 
@@ -465,6 +486,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
       group.rotation.y = t * 0.06 * scrollSpin.mult + mouseX * 0.6 + scrollSpin.extra;
       group.rotation.x = Math.sin(t * 0.15) * 0.08 + mouseY * 0.3 + scrollTilt.x;
+      sparks.rotation.y = t * 0.015;
+      sparks.rotation.x = Math.sin(t * 0.1) * 0.05;
       camera.position.x += (mouseX * 1.2 + scrollCam.x - camera.position.x) * 0.04;
       camera.position.y += (-mouseY * 1.2 + scrollCam.y - camera.position.y) * 0.04;
       camera.lookAt(0, 0, 0);
