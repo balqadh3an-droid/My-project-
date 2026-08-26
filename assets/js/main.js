@@ -50,18 +50,23 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
   /* ---------- Count-up stats ---------- */
   const statEls = document.querySelectorAll('.stat-num');
+  function formatCount(value, decimals) {
+    // Thousands separators read naturally on integer counts (1,400) but would
+    // be noise on a decimal one (4.42), so only apply them when decimals=0.
+    return decimals > 0 ? value.toFixed(decimals) : Math.round(value).toLocaleString('en-US');
+  }
   function animateCount(el) {
     const target = parseFloat(el.dataset.count);
     const decimals = parseInt(el.dataset.decimals || '0', 10);
     const suffix = el.dataset.suffix || '';
     if (prefersReduced) {
-      el.textContent = target.toFixed(decimals) + suffix;
+      el.textContent = formatCount(target, decimals) + suffix;
       return;
     }
     const obj = { v: 0 };
     gsap.to(obj, {
       v: target, duration: 1.6, ease: 'power2.out',
-      onUpdate: () => { el.textContent = obj.v.toFixed(decimals) + suffix; }
+      onUpdate: () => { el.textContent = formatCount(obj.v, decimals) + suffix; }
     });
   }
 
