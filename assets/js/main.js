@@ -201,7 +201,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  /* ---- Hero scene: node network backdrop + a small corner robot ---- */
+  /* ---- Hero scene: a glowing digital planet backdrop + a small corner robot ---- */
   function initHeroScene() {
     const canvas = document.getElementById('heroCanvas');
     const container = document.getElementById('hero');
@@ -212,48 +212,109 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
 
-    // Lighting (needed for the robot's standard material; harmless for the
-    // basic-material globe/particles, which ignore lights entirely)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    // Lighting (needed for the planet core + robot's standard materials;
+    // harmless for the basic/points materials, which ignore lights entirely)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
     keyLight.position.set(3, 4, 5);
     scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0xea580c, 1.6, 16);
+    const rimLight = new THREE.PointLight(0xea580c, 1.8, 20);
     rimLight.position.set(-3, 1.5, 3);
     scene.add(rimLight);
 
-    // Node network: icosahedron-based points connected by lines (circuit-like)
+    /* ---- The planet: solid core + circuit-grid overlay + fresnel atmosphere + rings ---- */
     const group = new THREE.Group();
     scene.add(group);
 
-    const geo = new THREE.IcosahedronGeometry(3.0, 3);
+    const gridGeo = new THREE.IcosahedronGeometry(2.15, 3);
+
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(2.1, 48, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0x0c1016, roughness: 0.55, metalness: 0.35,
+        emissive: 0x2a1206, emissiveIntensity: 0.5
+      })
+    );
+    group.add(core);
+
     const nodesMat = new THREE.PointsMaterial({
-      color: 0xea580c, size: 0.045, transparent: true, opacity: 0.9, sizeAttenuation: true
+      color: 0xff8a3d, size: 0.05, transparent: true, opacity: 0.95, sizeAttenuation: true
     });
-    const nodes = new THREE.Points(geo, nodesMat);
+    const nodes = new THREE.Points(gridGeo, nodesMat);
     group.add(nodes);
 
-    const edgesGeo = new THREE.EdgesGeometry(geo, 1);
-    const edgesMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.28 });
+    const edgesGeo = new THREE.EdgesGeometry(gridGeo, 1);
+    const edgesMat = new THREE.LineBasicMaterial({ color: 0xea580c, transparent: true, opacity: 0.4 });
     const edges = new THREE.LineSegments(edgesGeo, edgesMat);
     group.add(edges);
 
-    // Ambient floating particles
-    const particleCount = 220;
-    const particleGeo = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount; i++) {
-      const r = 6 + Math.random() * 6;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos((Math.random() * 2) - 1);
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = r * Math.cos(phi);
+    // Fresnel-glow atmosphere: a slightly larger back-facing shell, additive-blended,
+    // so the rim glows brightest at grazing angles -- the classic "planet glow" trick.
+    const glowMat = new THREE.ShaderMaterial({
+      uniforms: {
+        glowColor: { value: new THREE.Color(0xea580c) },
+        coefficient: { value: 0.45 },
+        power: { value: 2.4 }
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vPositionNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vPositionNormal = normalize((modelViewMatrix * vec4(position, 1.0)).xyz);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 glowColor;
+        uniform float coefficient;
+        uniform float power;
+        varying vec3 vNormal;
+        varying vec3 vPositionNormal;
+        void main() {
+          float intensity = pow(coefficient + dot(vNormal, vPositionNormal), power);
+          gl_FragColor = vec4(glowColor, clamp(intensity, 0.0, 1.0));
+        }
+      `,
+      side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false
+    });
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(2.55, 48, 48), glowMat);
+    group.add(glow);
+
+    // Two tilted "data rings", like a satellite/orbit halo
+    function makeRing(radius, color, opacity) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, 0.012, 8, 128),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity })
+      );
+      ring.rotation.x = Math.PI / 2.15;
+      ring.rotation.y = 0.4;
+      return ring;
     }
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const particleMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.03, transparent: true, opacity: 0.5 });
-    const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
+    const ring1 = makeRing(3.05, 0xea580c, 0.55);
+    const ring2 = makeRing(3.45, 0x94a3b8, 0.25);
+    ring2.rotation.y = -0.3;
+    group.add(ring1, ring2);
+
+    // Layered starfield: a wide, dim far layer + a closer, brighter near layer for depth
+    function makeStarfield(count, rMin, rMax, size, color, opacity) {
+      const g = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const r = rMin + Math.random() * (rMax - rMin);
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+      }
+      g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({ color, size, transparent: true, opacity, sizeAttenuation: true });
+      return new THREE.Points(g, mat);
+    }
+    const starsFar = makeStarfield(260, 9, 20, 0.025, 0x94a3b8, 0.55);
+    const starsNear = makeStarfield(90, 6, 9, 0.045, 0xea580c, 0.6);
+    scene.add(starsFar, starsNear);
 
     /* ---- Character: a small, corner-anchored rigged robot (RobotExpressive,
        a CC0 three.js sample asset) so it never competes with the name/stats
@@ -354,13 +415,29 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       mouseY = (e.clientY / window.innerHeight) - 0.5;
     }, { passive: true });
 
-    // Scroll-scrubbed depth: the globe recedes and the camera pulls back as the
-    // visitor scrolls past the hero, instead of just sitting there statically.
-    if (window.gsap && window.ScrollTrigger && !prefersReduced) {
-      const scrollTl = gsap.timeline({
+    // Scroll-driven "flythrough": on desktop, pin the hero for one extra
+    // viewport of scroll while the camera flies toward the planet and a veil
+    // fades to black, then release into About underneath -- the transition
+    // does the work instead of just sitting there statically. Mobile and
+    // reduced-motion skip the pin (heavy scroll-jacking reads badly on touch)
+    // and get a plain, cheap recede-and-fade instead.
+    const isDesktop = window.matchMedia('(min-width: 780px)').matches;
+    if (window.gsap && window.ScrollTrigger && !prefersReduced && isDesktop) {
+      const veil = document.querySelector('.hero-veil');
+      gsap.timeline({
+        scrollTrigger: { trigger: container, start: 'top top', end: '+=100%', scrub: 0.7, pin: true }
+      })
+        .to('.hero-content', { opacity: 0, y: -40, duration: 0.3, ease: 'power1.in' }, 0)
+        .to('.hero-stats', { opacity: 0, y: -20, duration: 0.26, ease: 'power1.in' }, 0)
+        .to(camera.position, { z: 1.3, ease: 'power1.in', duration: 1 }, 0.05)
+        .to(group.rotation, { y: '+=2.6', ease: 'power1.in', duration: 1 }, 0.05)
+        .to(group.scale, { x: 2.6, y: 2.6, z: 2.6, ease: 'power1.in', duration: 1 }, 0.05)
+        .to([starsFar.material, starsNear.material], { opacity: 0, duration: 0.3 }, 0.5)
+        .to(veil, { opacity: 1, duration: 0.35, ease: 'power2.in' }, 0.6);
+    } else if (window.gsap && window.ScrollTrigger && !prefersReduced) {
+      gsap.timeline({
         scrollTrigger: { trigger: container, start: 'top top', end: 'bottom top', scrub: 0.6 }
-      });
-      scrollTl
+      })
         .to(camera.position, { z: 13, ease: 'none' }, 0)
         .to(group.scale, { x: 0.7, y: 0.7, z: 0.7, ease: 'none' }, 0);
     }
@@ -390,7 +467,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
       group.rotation.y = t * 0.06 + mouseX * 0.6;
       group.rotation.x = Math.sin(t * 0.15) * 0.08 + mouseY * 0.3;
-      particles.rotation.y = -t * 0.02;
+      ring1.rotation.z += delta * 0.05;
+      ring2.rotation.z -= delta * 0.03;
+      starsFar.rotation.y = -t * 0.012;
+      starsNear.rotation.y = -t * 0.02;
       camera.position.x += (mouseX * 1.2 - camera.position.x) * 0.02;
       camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
       camera.lookAt(0, 0, 0);
