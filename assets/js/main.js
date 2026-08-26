@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 (() => {
   'use strict';
@@ -83,7 +82,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         .fromTo('.hero-stats', { opacity: 0, y: 12 }, {
           opacity: 1, y: 0, duration: 0.6,
           onStart: () => statEls.forEach(animateCount)
-        }, '-=0.2');
+        }, '-=0.2')
+        .fromTo('.hero-character', { opacity: 0, y: 16, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.7 }, '-=0.4');
 
       // Generic reveal-up sections -- a light 3D perspective flip, not just a fade
       document.querySelectorAll('.reveal-up').forEach((el) => {
@@ -112,11 +112,27 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
           scrollTrigger: { trigger: '#credentialGrid', start: 'top 85%', toggleActions: 'play none none reverse' }
         }
       );
-
     }
   } else {
     document.querySelectorAll('.reveal, .reveal-up, .tilt-card').forEach(el => el.style.opacity = 1);
     statEls.forEach(animateCount);
+  }
+
+  /* ---------- Active nav-link highlighting on scroll ---------- */
+  if (window.gsap && window.ScrollTrigger) {
+    const navAnchors = [...document.querySelectorAll('[data-nav-link]')];
+    const navSections = navAnchors.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+    const setActiveNav = (idx) => navAnchors.forEach((a, i) => a.classList.toggle('is-active', i === idx));
+    navSections.forEach((sec, i) => {
+      ScrollTrigger.create({
+        trigger: sec, start: 'top 55%', end: 'bottom 55%',
+        onEnter: () => setActiveNav(i), onEnterBack: () => setActiveNav(i)
+      });
+    });
+    ScrollTrigger.create({
+      trigger: '#hero', start: 'top top', end: 'bottom 55%',
+      onEnter: () => setActiveNav(-1), onEnterBack: () => setActiveNav(-1)
+    });
   }
 
   /* ---------- Tilt cards (pointer-based 3D tilt) ---------- */
@@ -155,12 +171,32 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     });
   }
 
+  /* ---------- Custom cursor accent ---------- */
+  if (canHover && window.gsap) {
+    const dot = document.querySelector('.cursor-dot');
+    if (dot) {
+      gsap.set(dot, { xPercent: -50, yPercent: -50 });
+      const moveDotX = gsap.quickTo(dot, 'x', { duration: 0.35, ease: 'power3.out' });
+      const moveDotY = gsap.quickTo(dot, 'y', { duration: 0.35, ease: 'power3.out' });
+      window.addEventListener('pointermove', (e) => {
+        moveDotX(e.clientX);
+        moveDotY(e.clientY);
+        dot.classList.add('is-visible');
+      }, { passive: true });
+      document.addEventListener('pointerleave', () => dot.classList.remove('is-visible'));
+      document.querySelectorAll('a, button, .tilt-card, .hero-character-frame').forEach((el) => {
+        el.addEventListener('mouseenter', () => dot.classList.add('is-active'));
+        el.addEventListener('mouseleave', () => dot.classList.remove('is-active'));
+      });
+    }
+  }
+
   /* ================= THREE.JS SCENES ================= */
   if (!hasWebGL) return;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  /* ---- Hero scene: node network backdrop + a rigged 3D robot that watches the cursor ---- */
+  /* ---- Hero scene: rotating electrical grid / node network backdrop ---- */
   function initHeroScene() {
     const canvas = document.getElementById('heroCanvas');
     const container = document.getElementById('hero');
@@ -170,17 +206,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
-    keyLight.position.set(3, 4, 5);
-    scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0xea580c, 1.6, 16);
-    rimLight.position.set(-3, 1.5, 3);
-    scene.add(rimLight);
-    const fillLight = new THREE.PointLight(0x64748b, 0.6, 16);
-    fillLight.position.set(2, -1, 4);
-    scene.add(fillLight);
 
     // Node network: icosahedron-based points connected by lines (circuit-like)
     const group = new THREE.Group();
@@ -215,77 +240,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    /* ---- Character: a rigged, animated robot (RobotExpressive, three.js sample asset) ---- */
-    const charPivot = new THREE.Group();
-    scene.add(charPivot);
-    charPivot.scale.setScalar(0.001);
-
-    let mixer = null;
-    const actions = {};
-    let activeAction = null;
-    let headBone = null;
-    let neckBone = null;
-    let robotReady = false;
-
-    function playAction(name, { once = false, next = null } = {}) {
-      const action = actions[name];
-      if (!action || !mixer) return;
-      action.reset();
-      action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
-      action.clampWhenFinished = once;
-      action.fadeIn(0.35);
-      action.play();
-      if (activeAction && activeAction !== action) activeAction.fadeOut(0.35);
-      activeAction = action;
-      if (once && next) {
-        const onFinished = (e) => {
-          if (e.action !== action) return;
-          mixer.removeEventListener('finished', onFinished);
-          playAction(next);
-        };
-        mixer.addEventListener('finished', onFinished);
-      }
-    }
-
-    let robotModel = null;
-    new GLTFLoader().load(
-      'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
-      (gltf) => {
-        const model = gltf.scene;
-        model.position.y = -1.05;
-        model.scale.setScalar(0.62);
-        charPivot.add(model);
-        robotModel = model;
-        resize(); // apply the correct desktop/mobile scale now that the model exists
-
-        headBone = model.getObjectByName('Head') || null;
-        neckBone = model.getObjectByName('Neck') || null;
-
-        mixer = new THREE.AnimationMixer(model);
-        gltf.animations.forEach((clip) => { actions[clip.name] = mixer.clipAction(clip); });
-        robotReady = true;
-
-        if (prefersReduced) {
-          charPivot.scale.setScalar(1);
-          if (actions.Idle) { actions.Idle.play(); mixer.update(0); }
-          renderer.render(scene, camera);
-          return;
-        }
-
-        playAction('Wave', { once: true, next: 'Idle' });
-        gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1, ease: 'back.out(1.6)', delay: 0.2 });
-
-        // A little UI-reactive personality: the robot responds to the primary actions.
-        document.querySelector('.btn-primary')?.addEventListener('mouseenter', () => {
-          if (robotReady) playAction('ThumbsUp', { once: true, next: 'Idle' });
-        });
-        document.querySelector('.btn-ghost')?.addEventListener('mouseenter', () => {
-          if (robotReady) playAction('Yes', { once: true, next: 'Idle' });
-        });
-      },
-      undefined,
-      () => { /* Model failed to load (offline/blocked) -- the globe backdrop still renders fine. */ }
-    );
+    // The hero character is now the Sketchfab "Arab Man (Saudi)" embed (a
+    // separate DOM element, see .hero-character in index.html/style.css) --
+    // this canvas only renders the node-network/particle backdrop.
 
     let w = 0, h = 0;
     function resize() {
@@ -294,13 +251,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      // Narrow/portrait viewports: park the character centered below the (centered) copy
-      // instead of off to the right of a left-aligned column that no longer exists.
-      const narrow = w < 780;
-      charPivot.position.x = narrow ? 0 : 2.6;
-      charPivot.position.y = narrow ? -4.6 : -0.1;
-      charPivot.userData.baseY = charPivot.position.y;
-      if (robotModel) robotModel.scale.setScalar(narrow ? 0.46 : 0.62);
     }
     resize();
     window.addEventListener('resize', resize);
@@ -317,9 +267,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       const scrollTl = gsap.timeline({
         scrollTrigger: { trigger: container, start: 'top top', end: 'bottom top', scrub: 0.6 }
       });
-      // (charPivot.scale is left alone here -- it's owned by the pop-in tween
-      // once the robot loads, and a second tween on the same props would
-      // fight it via GSAP's overwrite handling.)
       scrollTl
         .to(camera.position, { z: 13, ease: 'none' }, 0)
         .to(group.scale, { x: 0.7, y: 0.7, z: 0.7, ease: 'none' }, 0);
@@ -354,20 +301,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       camera.position.x += (mouseX * 1.2 - camera.position.x) * 0.02;
       camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
       camera.lookAt(0, 0, 0);
-
-      if (mixer) mixer.update(delta);
-
-      // Head/neck aim toward the cursor, layered on top of whatever clip is playing
-      if (headBone) {
-        headBone.rotation.y += mouseX * 0.55;
-        headBone.rotation.x += -mouseY * 0.3;
-      }
-      if (neckBone) {
-        neckBone.rotation.y += mouseX * 0.2;
-      }
-
-      const baseY = charPivot.userData.baseY ?? charPivot.position.y;
-      charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.07;
 
       renderer.render(scene, camera);
     }
