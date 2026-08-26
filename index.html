@@ -232,14 +232,15 @@
         <h2>On site, under pressure, on schedule.</h2>
       </div>
       <ol class="timeline">
-        <li class="timeline-item timeline-item-featured reveal-up">
-          <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-media">
+        <li class="timeline-item" id="exp-pif">
+          <div class="section-backdrop" aria-hidden="true">
             <picture>
               <source srcset="assets/img/scenes/construction.webp" type="image/webp">
               <img src="assets/img/scenes/construction.jpg" alt="" loading="lazy" decoding="async">
             </picture>
+            <div class="section-backdrop-mask"></div>
           </div>
+          <div class="timeline-marker" aria-hidden="true"></div>
           <div class="timeline-body">
             <p class="timeline-date">Public Investment Fund (PIF) · April 2026 &ndash; Present · Riyadh</p>
             <h3>Site Electrical Engineer &mdash; Azm Program</h3>
@@ -256,14 +257,15 @@
             </ul>
           </div>
         </li>
-        <li class="timeline-item timeline-item-featured reveal-up">
-          <div class="timeline-marker" aria-hidden="true"></div>
-          <div class="timeline-media">
+        <li class="timeline-item" id="exp-sec">
+          <div class="section-backdrop" aria-hidden="true">
             <picture>
               <source srcset="assets/img/scenes/power-grid.webp" type="image/webp">
               <img src="assets/img/scenes/power-grid.jpg" alt="" loading="lazy" decoding="async">
             </picture>
+            <div class="section-backdrop-mask"></div>
           </div>
+          <div class="timeline-marker" aria-hidden="true"></div>
           <div class="timeline-body">
             <p class="timeline-date">Saudi Energy Company · June &ndash; August 2024</p>
             <h3>Electrical Engineering Intern</h3>
@@ -278,7 +280,7 @@
             </ul>
           </div>
         </li>
-        <li class="timeline-item reveal-up">
+        <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
           <div class="timeline-body">
             <p class="timeline-date">King Khalid University · August 2023 &ndash; March 2025</p>
@@ -292,7 +294,7 @@
             </ul>
           </div>
         </li>
-        <li class="timeline-item reveal-up">
+        <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
           <div class="timeline-body">
             <p class="timeline-date">Family enterprise · Saudi Arabia</p>
@@ -308,7 +310,7 @@
             <p class="timeline-note">Working across four sectors before finishing my degree gave me commercial judgement early — how pricing, suppliers, and operational decisions connect, and what it costs when they don't.</p>
           </div>
         </li>
-        <li class="timeline-item reveal-up">
+        <li class="timeline-item">
           <div class="timeline-marker" aria-hidden="true"></div>
           <div class="timeline-body">
             <p class="timeline-date">Alumni Programs</p>
@@ -337,37 +339,36 @@
 
   <!-- PROJECTS -->
   <section class="section section-alt" id="projects">
+    <div class="section-backdrop" aria-hidden="true">
+      <picture>
+        <source srcset="assets/img/scenes/circuit.webp" type="image/webp">
+        <img src="assets/img/scenes/circuit.jpg" alt="" loading="lazy" decoding="async">
+      </picture>
+      <div class="section-backdrop-mask"></div>
+    </div>
     <div class="section-inner">
       <div class="section-head reveal-up">
         <p class="kicker">Projects</p>
         <h2>The rare shipped software on an electrical CV.</h2>
       </div>
       <article class="project-card reveal-up">
-        <div class="project-card-media">
-          <picture>
-            <source srcset="assets/img/scenes/circuit.webp" type="image/webp">
-            <img src="assets/img/scenes/circuit.jpg" alt="" loading="lazy" decoding="async">
-          </picture>
+        <div class="project-card-head">
+          <h3>AI Face Recognition System</h3>
+          <span class="project-tag">Capstone &middot; King Khalid University</span>
         </div>
-        <div class="project-card-copy">
-          <div class="project-card-head">
-            <h3>AI Face Recognition System</h3>
-            <span class="project-tag">Capstone &middot; King Khalid University</span>
-          </div>
-          <p>
-            A real-time recognition pipeline built solo. PCA/Eigenfaces for
-            identity, with live gender, age and emotion classification layered
-            on top. Runs at roughly 30 frames per second on CPU-only hardware,
-            served through a Flask web app.
-          </p>
-          <ul class="tech-pills">
-            <li>Python</li>
-            <li>OpenCV</li>
-            <li>PCA / Eigenfaces</li>
-            <li>Flask</li>
-            <li>Real-Time Inference</li>
-          </ul>
-        </div>
+        <p>
+          A real-time recognition pipeline built solo. PCA/Eigenfaces for
+          identity, with live gender, age and emotion classification layered
+          on top. Runs at roughly 30 frames per second on CPU-only hardware,
+          served through a Flask web app.
+        </p>
+        <ul class="tech-pills">
+          <li>Python</li>
+          <li>OpenCV</li>
+          <li>PCA / Eigenfaces</li>
+          <li>Flask</li>
+          <li>Real-Time Inference</li>
+        </ul>
       </article>
     </div>
   </section>

@@ -242,6 +242,12 @@ img,canvas{ display:block; max-width:100%; }
 /* Soft ambient glow orbs -- a quiet echo of the hero's planet glow, tucked
    behind a few section headers for depth. Purely decorative: absolute,
    blurred, low-opacity, z-index below the section content, no layout impact. */
+/* These blurred glow-orb circles are intentionally larger than their
+   section and positioned partly outside it for a soft bleed effect --
+   clip them at the section edge so they can't expand the page's
+   scrollable width (the blur already fades them out well before the
+   edge, so the clip is imperceptible). */
+#about, #skills, #projects{ overflow:hidden; }
 #about::before, #skills::before, #projects::before{
   content:''; position:absolute; z-index:0; pointer-events:none;
   width:520px; height:520px; border-radius:50%; filter:blur(70px);
@@ -342,9 +348,10 @@ img,canvas{ display:block; max-width:100%; }
 .timeline-item{ position:relative; padding-bottom:var(--space-6); }
 .timeline-item:last-child{ padding-bottom:0; }
 .timeline-marker{
-  position:absolute; left:-33px; top:4px; width:11px; height:11px; border-radius:50%;
+  position:absolute; z-index:1; left:-33px; top:4px; width:11px; height:11px; border-radius:50%;
   background:var(--color-accent); box-shadow:0 0 0 4px var(--color-accent-soft);
 }
+.timeline-body{ position:relative; z-index:1; }
 .timeline-date{ font-size:0.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--color-fg-faint); margin-bottom:6px; }
 .timeline-body h3{ font-size:1.25rem; margin-bottom:8px; }
 .timeline-body p{ color:var(--color-fg-muted); max-width:680px; margin-bottom:10px; }
@@ -362,60 +369,45 @@ img,canvas{ display:block; max-width:100%; }
 }
 .timeline-body li strong{ color:var(--color-fg); font-weight:600; }
 
-/* The two lead roles get a "cinematic" photo -- desaturated and dimmed at
-   rest, easing to full colour and a slight scale on hover, the same
-   reveal-on-hover treatment used on the Projects card below. */
-.timeline-media{
-  border-radius:var(--radius-md); overflow:hidden; margin-bottom:var(--space-3);
-  max-width:640px; aspect-ratio:16/8; border:1px solid var(--color-border);
+/* Section-level photo backdrops -- contained absolutely within their own
+   section/timeline-item box (never fixed/global), sitting behind that
+   element's own normal-flow content via z-index alone. Image + a heavy
+   dark gradient mask baked into two stacked layers for guaranteed
+   contrast, per the strict stacking spec. */
+.section-backdrop{
+  position:absolute; inset:0; z-index:-10; overflow:hidden; pointer-events:none;
+  border-radius:inherit;
 }
-.timeline-media img{
-  width:100%; height:100%; object-fit:cover;
-  filter:grayscale(35%) brightness(0.75) contrast(1.1);
-  transition:filter .6s ease, transform .6s cubic-bezier(.16,1,.3,1);
-  will-change:filter, transform;
+.section-backdrop img{
+  width:100%; height:100%; object-fit:cover; opacity:0.3;
+  filter:brightness(0.75) contrast(1.25);
 }
-.timeline-item-featured:hover .timeline-media img{
-  filter:grayscale(0%) brightness(0.95); transform:scale(1.04);
+.section-backdrop-mask{
+  position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(5,7,10,0.9) 0%, rgba(5,7,10,0.75) 50%, rgba(5,7,10,0.95) 100%);
 }
 
 /* Projects */
 .project-card{
   background:rgba(8,12,22,0.65);
-  backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
+  backdrop-filter:blur(28px) saturate(180%); -webkit-backdrop-filter:blur(28px) saturate(180%);
   border:1px solid rgba(255,255,255,0.12); border-radius:var(--radius-lg);
-  overflow:hidden; max-width:900px;
-  display:grid; grid-template-columns:1fr 1fr; align-items:stretch;
+  padding:var(--space-4) var(--space-4); max-width:760px;
   transition:border-color .35s var(--ease), box-shadow .35s var(--ease);
 }
 .project-card:hover{
   border-color:rgba(234,88,12,0.4); box-shadow:0 20px 45px -25px rgba(234,88,12,0.25);
 }
-.project-card-media{ position:relative; min-height:220px; overflow:hidden; }
-.project-card-media img{
-  width:100%; height:100%; object-fit:cover;
-  filter:grayscale(35%) brightness(0.75) contrast(1.1);
-  transition:filter .6s ease, transform .6s cubic-bezier(.16,1,.3,1);
-  will-change:filter, transform;
-}
-.project-card:hover .project-card-media img{
-  filter:grayscale(0%) brightness(0.95); transform:scale(1.04);
-}
-.project-card-copy{ padding:var(--space-4); display:flex; flex-direction:column; justify-content:center; }
 .project-card-head{
   display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin-bottom:var(--space-2);
 }
 .project-card-head h3{ font-size:1.3rem; }
 .project-tag{ font-size:0.78rem; color:var(--color-fg-faint); }
-.project-card-copy > p{ color:var(--color-fg-muted); margin-bottom:var(--space-3); }
+.project-card > p{ color:var(--color-fg-muted); margin-bottom:var(--space-3); }
 .tech-pills{ display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0; margin:0; }
 .tech-pills li{
   padding:6px 14px; border-radius:999px; border:1px solid var(--color-border-strong);
   font-size:0.82rem; color:var(--color-fg-muted); background:var(--color-bg-alt);
-}
-@media (max-width:760px){
-  .project-card{ grid-template-columns:1fr; }
-  .project-card-media{ min-height:200px; }
 }
 
 /* Skills */
