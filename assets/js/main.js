@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 (() => {
   'use strict';
@@ -376,14 +375,21 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     }
   }
 
-  /* ================= THREE.JS: floating character =================
-     The photography is the backdrop now, so the WebGL layer carries only
-     the small corner robot -- no competing geometry behind the copy. */
+
+  /* ================= THREE.JS: THE CURRENT =================
+     An abstract light rig in place of any character: a handful of long
+     graceful filaments hanging in 3D space, with packets of light running
+     along them like current through a line. It reads as energy moving
+     through a grid, which is the subject of the whole site, and it never
+     competes with the photography the way a literal figure did.
+
+     The whole rig flies to a new station for each act, so scrolling
+     carries it across the frame rather than parking it in a corner. */
   if (!hasWebGL) return;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  function initCharacterScene() {
+  function initCurrentScene() {
     const canvas = document.getElementById('webglCanvas');
     if (!canvas) return;
 
@@ -394,98 +400,161 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(0, 0, 9);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
-    keyLight.position.set(3, 4, 5);
-    scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0xff6a1a, 2.2, 24);
-    rimLight.position.set(-3, 1.5, 3);
-    scene.add(rimLight);
+    const rig = new THREE.Group();
+    scene.add(rig);
 
-    const charPivot = new THREE.Group();
-    scene.add(charPivot);
-    charPivot.scale.setScalar(0.001);
+    /* ---- A soft round sprite, so every light packet is a glow rather
+       than a hard square pixel. ---- */
+    function makeGlowTexture() {
+      const size = 64;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0.00, 'rgba(255,255,255,1)');
+      g.addColorStop(0.22, 'rgba(255,205,150,0.9)');
+      g.addColorStop(0.5, 'rgba(255,120,40,0.32)');
+      g.addColorStop(1.00, 'rgba(255,106,26,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(c);
+    }
+    const glowTex = makeGlowTexture();
 
-    let mixer = null;
-    const actions = {};
-    let activeAction = null;
-    let headBone = null;
-    let neckBone = null;
-    let robotReady = false;
-    let robotModel = null;
+    /* ---- Filaments: long, slack catenary-ish sweeps across the frame. ---- */
+    const CURVES = 5;
+    const SAMPLES = 220;          // dense polyline per curve, sampled once
+    const TRAVELLERS = 7;         // light packets per curve
+    const TAIL = 5;               // dots making up each packet's tail
 
-    function playAction(name, { once = false, next = null } = {}) {
-      const action = actions[name];
-      if (!action || !mixer) return;
-      action.reset();
-      action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
-      action.clampWhenFinished = once;
-      action.fadeIn(0.35);
-      action.play();
-      if (activeAction && activeAction !== action) activeAction.fadeOut(0.35);
-      activeAction = action;
-      if (once && next) {
-        const onFinished = (e) => {
-          if (e.action !== action) return;
-          mixer.removeEventListener('finished', onFinished);
-          playAction(next);
-        };
-        mixer.addEventListener('finished', onFinished);
+    const paths = [];
+    for (let i = 0; i < CURVES; i++) {
+      const seed = i * 1.9 + 0.4;
+      const pts = [];
+      const n = 7;
+      for (let k = 0; k < n; k++) {
+        const t = k / (n - 1);
+        pts.push(new THREE.Vector3(
+          -9 + t * 18 + Math.sin(seed + t * 2.6) * 1.4,
+          Math.sin(seed * 1.6 + t * Math.PI * 1.5) * 2.4 + (i - 2) * 0.85,
+          Math.cos(seed * 1.15 + t * Math.PI * 1.1) * 3.2 - 1.2
+        ));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+      // Sample once into a flat array; travellers then just index into it,
+      // which keeps the per-frame cost to simple lerps.
+      const sampled = curve.getPoints(SAMPLES - 1);
+      paths.push(sampled);
+
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(sampled);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0xff6a1a, transparent: true, opacity: 0.13,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      });
+      rig.add(new THREE.Line(lineGeo, lineMat));
+    }
+
+    /* ---- Light packets running the filaments ---- */
+    const DOTS = CURVES * TRAVELLERS * TAIL;
+    const dotGeo = new THREE.BufferGeometry();
+    const dotPos = new Float32Array(DOTS * 3);
+    const dotCol = new Float32Array(DOTS * 3);
+    dotGeo.setAttribute('position', new THREE.BufferAttribute(dotPos, 3));
+    dotGeo.setAttribute('color', new THREE.BufferAttribute(dotCol, 3));
+
+    // Per-traveller state: which path, where along it, how fast.
+    const travellers = [];
+    for (let c = 0; c < CURVES; c++) {
+      for (let j = 0; j < TRAVELLERS; j++) {
+        travellers.push({
+          path: c,
+          t: Math.random(),
+          speed: 0.035 + Math.random() * 0.055
+        });
       }
     }
 
-    new GLTFLoader().load(
-      'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
-      (gltf) => {
-        const model = gltf.scene;
-        model.position.y = -1.05;
-        charPivot.add(model);
-        robotModel = model;
-        resize();
+    // Tail dots fade from a hot white head to the brand orange.
+    const headCol = new THREE.Color(0xfff1e2);
+    const tailCol = new THREE.Color(0xff5a0a);
+    travellers.forEach((_, ti) => {
+      for (let d = 0; d < TAIL; d++) {
+        const f = d / (TAIL - 1);
+        const col = headCol.clone().lerp(tailCol, f).multiplyScalar(1 - f * 0.72);
+        const idx = (ti * TAIL + d) * 3;
+        dotCol[idx] = col.r; dotCol[idx + 1] = col.g; dotCol[idx + 2] = col.b;
+      }
+    });
+    dotGeo.attributes.color.needsUpdate = true;
 
-        headBone = model.getObjectByName('Head') || null;
-        neckBone = model.getObjectByName('Neck') || null;
+    const dotMat = new THREE.PointsMaterial({
+      size: 0.34, map: glowTex, vertexColors: true,
+      transparent: true, opacity: 0.95, sizeAttenuation: true,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    rig.add(new THREE.Points(dotGeo, dotMat));
 
-        mixer = new THREE.AnimationMixer(model);
-        gltf.animations.forEach((clip) => { actions[clip.name] = mixer.clipAction(clip); });
-        robotReady = true;
+    // Sample a path at normalised t with a lerp between stored points.
+    const tmp = new THREE.Vector3();
+    function samplePath(pathIdx, t) {
+      const pts = paths[pathIdx];
+      const last = pts.length - 1;
+      const f = ((t % 1) + 1) % 1 * last;
+      const i0 = Math.floor(f);
+      const i1 = Math.min(i0 + 1, last);
+      return tmp.copy(pts[i0]).lerp(pts[i1], f - i0);
+    }
 
-        if (prefersReduced) {
-          charPivot.scale.setScalar(1);
-          if (actions.Idle) { actions.Idle.play(); mixer.update(0); }
-          renderer.render(scene, camera);
-          return;
-        }
+    /* ---- Where the rig flies for each act ----
+       GSAP tweens these targets; the render loop eases the rig toward them
+       and layers the mouse parallax on top, so the two never fight. */
+    const target = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, glow: 1 };
+    const stations = {
+      hero:       { x:  1.6, y:  0.4, z:  0.0, rx: -0.12, ry:  0.22, rz:  0.06, glow: 1.0 },
+      about:      { x: -2.4, y: -0.6, z: -1.4, rx:  0.16, ry: -0.34, rz: -0.10, glow: 0.85 },
+      experience: { x:  2.6, y:  1.0, z: -0.6, rx: -0.22, ry:  0.46, rz:  0.12, glow: 0.75 },
+      projects:   { x: -1.2, y:  0.2, z:  1.8, rx:  0.10, ry: -0.16, rz: -0.05, glow: 1.15 },
+      skills:     { x:  0.0, y: -1.2, z: -2.2, rx:  0.30, ry:  0.10, rz:  0.03, glow: 0.9 }
+    };
 
-        playAction('Wave', { once: true, next: 'Idle' });
-        gsap?.to?.(charPivot.scale, { x: 1, y: 1, z: 1, duration: 1, ease: 'back.out(1.6)', delay: 0.2 });
-
-        document.querySelector('.btn-primary')?.addEventListener('mouseenter', () => {
-          if (robotReady) playAction('ThumbsUp', { once: true, next: 'Idle' });
+    if (window.gsap && window.ScrollTrigger && !prefersReduced) {
+      const acts = [
+        ['hero', '#hero', '#hero'],
+        ['about', '#about', '#credentials'],
+        ['experience', '#experience', '#experience'],
+        ['projects', '#projects', '#projects'],
+        ['skills', '#skills', '#contact']
+      ];
+      acts.forEach(([name, from, to]) => {
+        const fromEl = document.querySelector(from);
+        const toEl = document.querySelector(to);
+        if (!fromEl || !toEl) return;
+        const fly = () => gsap.to(target, {
+          ...stations[name], duration: 2.2, ease: 'power2.inOut', overwrite: 'auto'
         });
-        document.querySelector('.btn-ghost')?.addEventListener('mouseenter', () => {
-          if (robotReady) playAction('Yes', { once: true, next: 'Idle' });
+        ScrollTrigger.create({
+          trigger: fromEl, start: 'top 60%',
+          endTrigger: toEl, end: 'bottom 40%',
+          onEnter: fly, onEnterBack: fly
         });
-      },
-      undefined,
-      () => { /* Model blocked/offline -- the photographic backdrop still carries the page. */ }
-    );
+      });
+      Object.assign(target, stations.hero);
+    } else {
+      Object.assign(target, stations.hero);
+    }
 
     let w = 0, h = 0;
     function resize() {
       w = window.innerWidth; h = window.innerHeight;
       renderer.setSize(w, h, false);
       const narrow = w < 780;
-      camera.fov = narrow ? 62 : 50;
+      camera.fov = narrow ? 64 : 50;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-
-      // Pin the robot to a screen corner so it never crowds the copy or
-      // the glass panels sitting over the photography.
-      charPivot.position.x = narrow ? 1.72 : 5.5;
-      charPivot.position.y = narrow ? -3.05 : 2.9;
-      charPivot.userData.baseY = charPivot.position.y;
-      if (robotModel) robotModel.scale.setScalar(narrow ? 0.14 : 0.2);
+      // Pull the whole rig back and shrink it on phones so the filaments
+      // read as depth behind the copy rather than clutter across it.
+      rig.scale.setScalar(narrow ? 0.72 : 1);
+      dotMat.size = narrow ? 0.26 : 0.34;
     }
     resize();
     window.addEventListener('resize', resize);
@@ -501,7 +570,23 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     const clock = new THREE.Clock();
 
+    function writeDots(t) {
+      travellers.forEach((tr, ti) => {
+        for (let d = 0; d < TAIL; d++) {
+          // Tail dots sit a little way back along the same filament.
+          const p = samplePath(tr.path, tr.t - d * 0.006);
+          const idx = (ti * TAIL + d) * 3;
+          dotPos[idx] = p.x; dotPos[idx + 1] = p.y; dotPos[idx + 2] = p.z;
+        }
+      });
+      dotGeo.attributes.position.needsUpdate = true;
+    }
+
     if (prefersReduced) {
+      // Hold a single still frame -- no travel, no drift.
+      writeDots(0);
+      rig.position.set(target.x, target.y, target.z);
+      rig.rotation.set(target.rx, target.ry, target.rz);
       renderer.render(scene, camera);
       return;
     }
@@ -514,24 +599,26 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       elapsed += delta;
       const t = elapsed;
 
-      if (mixer) mixer.update(delta);
+      // Current keeps running along every filament.
+      travellers.forEach((tr) => { tr.t = (tr.t + tr.speed * delta) % 1; });
+      writeDots(t);
 
-      // Head/neck aim toward the cursor, layered over whatever clip is playing
-      if (headBone) {
-        headBone.rotation.y += mouseX * 0.55;
-        headBone.rotation.x += -mouseY * 0.3;
-      }
-      if (neckBone) {
-        neckBone.rotation.y += mouseX * 0.2;
-      }
+      // Ease toward the act's station, with mouse parallax layered on.
+      const px = mouseX * 0.9, py = -mouseY * 0.7;
+      rig.position.x += ((target.x + px) - rig.position.x) * 0.045;
+      rig.position.y += ((target.y + py) - rig.position.y) * 0.045;
+      rig.position.z += (target.z - rig.position.z) * 0.045;
+      rig.rotation.x += ((target.rx + mouseY * 0.12) - rig.rotation.x) * 0.045;
+      rig.rotation.y += ((target.ry + mouseX * 0.18 + Math.sin(t * 0.09) * 0.06) - rig.rotation.y) * 0.045;
+      rig.rotation.z += (target.rz - rig.rotation.z) * 0.045;
 
-      const baseY = charPivot.userData.baseY ?? charPivot.position.y;
-      charPivot.position.y = baseY + Math.sin(t * 0.9) * 0.06;
+      // Packets pulse gently, and brighten on the acts that ask for it.
+      dotMat.opacity = target.glow * (0.82 + Math.sin(t * 1.5) * 0.12);
 
       renderer.render(scene, camera);
     }
     animate();
   }
 
-  initCharacterScene();
+  initCurrentScene();
 })();
