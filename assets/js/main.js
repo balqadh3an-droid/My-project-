@@ -17,11 +17,17 @@ import * as THREE from 'three';
     ScrollTrigger.config({ ignoreMobileResize: true });
   }
   if (window.Lenis && window.gsap && window.ScrollTrigger && !prefersReduced) {
+    // A long duration reads as lag on a trackpad, where two-finger scrolling
+    // sends a fast stream of small deltas and every one of them restarts the
+    // ease. Keep it short enough to feel attached to the fingers, and let the
+    // wheel multiplier carry the distance instead.
     const lenis = new Lenis({
-      duration: 1.15,
+      duration: 0.65,
       easing: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
       smoothWheel: true,
-      touchMultiplier: 1.8
+      wheelMultiplier: 1.15,
+      touchMultiplier: 1.8,
+      syncTouch: true
     });
     lenis.on('scroll', ScrollTrigger.update);
     gsap.ticker.add((time) => lenis.raf(time * 1000));
@@ -194,15 +200,26 @@ import * as THREE from 'three';
           onStart: () => statEls.forEach(animateCount)
         }, '-=0.2');
 
-      // Hero copy lifts and dissolves as you leave the opening frame
-      gsap.to('.hero-content', {
-        opacity: 0, y: -60, ease: 'none',
-        scrollTrigger: { trigger: '#hero', start: 'center center', end: 'bottom top', scrub: 0.6 }
-      });
-      gsap.to('.hero-stats', {
-        opacity: 0, y: -30, ease: 'none',
-        scrollTrigger: { trigger: '#hero', start: 'center center', end: 'bottom top', scrub: 0.6 }
-      });
+      // Hero copy lifts and dissolves as you leave the opening frame.
+      // These must be fromTo with immediateRender:false. A plain .to()
+      // infers its start value on refresh, which can land mid-entrance
+      // while opacity is still 0 -- the stats row then never comes back
+      // when you scroll home again. Pinning the start at 1 fixes that,
+      // and immediateRender:false keeps it from stomping the entrance.
+      gsap.fromTo('.hero-content',
+        { opacity: 1, y: 0 },
+        {
+          opacity: 0, y: -60, ease: 'none', immediateRender: false,
+          scrollTrigger: { trigger: '#hero', start: 'center center', end: 'bottom top', scrub: 0.6 }
+        }
+      );
+      gsap.fromTo('.hero-stats',
+        { opacity: 1, y: 0 },
+        {
+          opacity: 0, y: -30, ease: 'none', immediateRender: false,
+          scrollTrigger: { trigger: '#hero', start: 'center center', end: 'bottom top', scrub: 0.6 }
+        }
+      );
 
       /* --- Section headings: the kicker tightens in, then the headline
              wipes up out of its own baseline like a title card. --- */

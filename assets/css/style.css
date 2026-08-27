@@ -98,9 +98,12 @@ img,canvas{ display:block; max-width:100%; }
   position:relative;
   background:transparent; border:0; box-shadow:none; border-radius:0;
 }
+/* Vertical bleed is kept tight on purpose. Each halo extends past its own
+   block, so if two stacked blocks each reached far up and down their halos
+   would meet in the gap and read as one dark band across the photograph. */
 .glass-panel::before{
   content:''; position:absolute; z-index:-1; pointer-events:none;
-  inset:-46px -70px;
+  inset:-24px -70px;
   background:radial-gradient(ellipse 74% 92% at 40% 50%,
     rgba(3,5,9,0.95) 0%,
     rgba(3,5,9,0.90) 40%,
@@ -116,7 +119,7 @@ img,canvas{ display:block; max-width:100%; }
 }
 @media (max-width:780px){
   .glass-panel::before{
-    inset:-28px -30px;
+    inset:-16px -28px;
     background:radial-gradient(ellipse 92% 86% at 50% 50%,
       rgba(3,5,9,0.94) 0%,
       rgba(3,5,9,0.86) 40%,
@@ -422,7 +425,7 @@ img,canvas{ display:block; max-width:100%; }
 .timeline::before{
   content:''; position:absolute; left:5px; top:6px; bottom:6px; width:1px; background:var(--color-border-strong);
 }
-.timeline-item{ position:relative; padding-bottom:var(--space-4); }
+.timeline-item{ position:relative; padding-bottom:var(--space-6); }
 .timeline-item:last-child{ padding-bottom:0; }
 .timeline-marker{
   position:absolute; z-index:2; left:-33px; top:22px; width:11px; height:11px; border-radius:50%;
@@ -465,12 +468,12 @@ img,canvas{ display:block; max-width:100%; }
 }
 
 /* Skills */
-.skills-groups{ display:flex; flex-direction:column; gap:var(--space-3); }
+.skills-groups{ display:flex; flex-direction:column; gap:var(--space-5); }
 .skill-group{ padding:var(--space-4); }
 /* Pills carry their own fill and border, so these blocks need far less
    halo than prose does -- keep it light or the column reads as banding. */
 .skill-group.glass-panel::before{
-  inset:-24px -50px;
+  inset:-15px -50px;
   background:radial-gradient(ellipse 72% 96% at 40% 50%,
     rgba(3,5,9,0.74) 0%,
     rgba(3,5,9,0.56) 48%,
