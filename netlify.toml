@@ -1,0 +1,33 @@
+# Static site -- nothing to build, the repo root is what gets served.
+[build]
+  publish = "."
+
+# Photographs and the favicon keep stable filenames and never change in
+# place, so they can be cached hard.
+[[headers]]
+  for = "/assets/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/assets/img/scenes/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+# style.css and main.js are NOT content-hashed -- their names stay the same
+# across deploys. They must revalidate, or a returning visitor keeps the old
+# design after an update.
+[[headers]]
+  for = "/assets/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
