@@ -16,7 +16,13 @@ import * as THREE from 'three';
     gsap.registerPlugin(ScrollTrigger);
     ScrollTrigger.config({ ignoreMobileResize: true });
   }
-  if (window.Lenis && window.gsap && window.ScrollTrigger && !prefersReduced) {
+  // Touch devices are deliberately left alone. Phones already have excellent
+  // momentum scrolling, and handing the finger over to a JS-driven easing
+  // (syncTouch) fights it -- the drag stops tracking the thumb and lurches.
+  // Lenis here smooths the wheel/trackpad only; on touch the browser's own
+  // native scrolling runs untouched, which is what actually feels smooth.
+  const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  if (window.Lenis && window.gsap && window.ScrollTrigger && !prefersReduced && !isCoarsePointer) {
     // A long duration reads as lag on a trackpad, where two-finger scrolling
     // sends a fast stream of small deltas and every one of them restarts the
     // ease. Keep it short enough to feel attached to the fingers, and let the
@@ -26,8 +32,7 @@ import * as THREE from 'three';
       easing: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
       smoothWheel: true,
       wheelMultiplier: 1.15,
-      touchMultiplier: 1.8,
-      syncTouch: true
+      syncTouch: false
     });
     lenis.on('scroll', ScrollTrigger.update);
     gsap.ticker.add((time) => lenis.raf(time * 1000));
@@ -163,8 +168,11 @@ import * as THREE from 'three';
 
       // Ken Burns: the frame keeps pushing in and drifting across its own
       // act, so the image is never sitting perfectly still while you read.
+      // Skipped on touch: re-compositing a full-screen image on every scroll
+      // frame is the main thing that makes a phone's native scroll stutter,
+      // and a stuttering drag costs far more than the drift is worth.
       const img = slides[slide]?.querySelector('img');
-      if (img) {
+      if (img && !isCoarsePointer) {
         gsap.fromTo(img,
           { scale: 1.04, yPercent: -1.5 },
           {

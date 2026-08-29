@@ -63,6 +63,12 @@ body{
   /* Let the photographs run rich -- they are the page, not a texture. */
   filter:saturate(1.08) contrast(1.06);
 }
+/* On phones the Ken Burns drift is switched off in JS, so promoting five
+   full-screen images to their own compositor layers just burns memory and
+   makes the native scroll judder. Let them stay flat. */
+@media (max-width:780px){
+  .backdrop-slide img{ will-change:auto; transform:none; }
+}
 /* Almost nothing: a thin darkening at the very top and bottom edges so the
    fixed nav and the footer keep their footing, plus the faintest corner
    fall-off. Contrast for body copy is handled locally, per text block, by
